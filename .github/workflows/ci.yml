@@ -1,0 +1,85 @@
+# 衔星 | Starbit — 持续集成
+# 触发：push / PR 到主分支（兼容 main 与 master）
+# 前置：工程脚手架（package.json）落地后生效，脚本约定见下方注释。
+#       主分支推送会直接触发，建议脚手架就绪后再推送 GitHub 启用。
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitee/**'
+      - '.github/**'
+      - '.design_library/**'
+  pull_request:
+    branches: [main, master]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitee/**'
+      - '.github/**'
+      - '.design_library/**'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck & Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        # package.json scripts 约定：npm run typecheck -> tsc --noEmit
+        run: npm run typecheck
+
+      - name: Lint
+        # scripts 约定：npm run lint -> eslint 全量检查
+        run: npm run lint
+
+      - name: Unit tests
+        # scripts 约定：npm run test:unit -> vitest run（core 层纯 TS，无需 Electron）
+        run: npm run test:unit
+
+  e2e:
+    name: Electron E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules for Electron
+        # node-pty / better-sqlite3 等原生模块需按 Electron ABI 重编译
+        run: npx electron-builder install-app-deps
+
+      - name: Install Playwright deps & Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0
+
+      - name: Electron E2E tests
+        # scripts 约定：npm run test:e2e -> playwright test（_electron.launch 关键路径）
+        # Electron GUI 在无头环境需 xvfb 包裹
+        run: xvfb-run --auto-servernum npm run test:e2e

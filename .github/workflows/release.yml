@@ -1,0 +1,81 @@
+# 衔星 | Starbit — 发布
+# 触发：推送 v* 标签（如 v1.0.0）；也支持手动触发。
+# 流程：三平台 matrix 构建 + electron-builder 打包 -> 上传产物 -> 汇总到 GitHub Release 草稿
+#       代码签名/公证尚未配置（本地无证书），正式分发前请补充；产物默认无签名。
+# 产物约定：electron-builder 输出到 release/（对应根目录 .gitignore 中 release/）。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
+
+      - name: Build app
+        # scripts 约定：npm run build -> electron-vite build（产出 main/preload/renderer 到 dist*/out）
+        run: npm run build
+
+      - name: Package installer
+        # scripts 约定：npm run dist -> electron-builder --publish never
+        # Windows 出 NSIS 安装器；macOS 需签名/公证才可分发（当前跳过）
+        run: npm run dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: starbit-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.zip
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+            release/latest*.yml
+            release/latest*.json
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            artifacts/*
