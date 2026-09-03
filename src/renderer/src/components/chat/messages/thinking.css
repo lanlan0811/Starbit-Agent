@@ -1,0 +1,35 @@
+.thinking {
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.thinking__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-thinking);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  padding: 4px 0;
+  width: fit-content;
+}
+
+.thinking__header:hover {
+  opacity: 0.8;
+}
+
+.thinking__body {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-thinking);
+  padding: 8px 12px;
+  border-left: 2px solid var(--color-thinking);
+  margin: 4px 0 0 8px;
+  background: color-mix(in srgb, var(--color-thinking) 5%, transparent);
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  user-select: none;
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow-y: auto;
+}

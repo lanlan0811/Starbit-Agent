@@ -1,0 +1,83 @@
+.sidebar {
+  width: var(--sidebar-width);
+  height: 100%;
+  background: var(--color-bg-app);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2) 0;
+  flex-shrink: 0;
+}
+
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.sidebar__item {
+  width: var(--size-nav-button);
+  height: var(--size-nav-button);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-card);
+  color: var(--color-text-secondary);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+  position: relative;
+}
+
+.sidebar__item:hover {
+  background: var(--color-bg-inset);
+  color: var(--color-text-primary);
+}
+
+.sidebar__item--brand {
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+
+.sidebar__item--brand:hover {
+  background: var(--color-primary-weak);
+}
+
+.sidebar__spacer {
+  flex: 1;
+}
+
+.sidebar__group--bottom {
+  margin-top: var(--space-2);
+}
+
+/* Tooltip（隐藏，由 data-tooltip 占位） */
+.sidebar__item[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-text-primary);
+  color: var(--color-bg-surface);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-input);
+  white-space: nowrap;
+  box-shadow: var(--shadow-1);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  animation: tooltip-in var(--duration-fast) var(--ease-standard) forwards;
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,10 @@
+packages:
+  - "."
+  - "!**/test/**"
+  - "!**/e2e/**"
+
+allowBuilds:
+  better-sqlite3: set this to true or false
+  electron: true
+  esbuild: true
+  node-pty: true

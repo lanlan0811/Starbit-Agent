@@ -1,0 +1,82 @@
+/* === 设计系统 Tokens —— 依据 .design_library/starbit/colors_and_type.css === */
+/* @light-only */
+
+:root {
+  /* accent */
+  --color-primary: #3b6ff0;
+  --color-primary-hover: #2e5bd6;
+  --color-primary-weak: #eaf0fe;
+
+  /* status */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-thinking: #8b5cf6;
+  --color-cache-hit: #0e9f8a;
+
+  /* bg */
+  --color-bg-app: #f7f8fa;
+  --color-bg-surface: #ffffff;
+  --color-bg-inset: #f2f3f5;
+
+  /* text */
+  --color-text-primary: #1f2329;
+  --color-text-secondary: #6b7280;
+
+  /* border */
+  --color-border: #e5e7eb;
+
+  /* typography */
+  --font-body: 'Segoe UI', system-ui, 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Cascadia Code', Consolas, monospace;
+  --font-size-caption: 12px;
+  --font-size-body: 13px;
+  --font-size-small: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 20px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* radius */
+  --radius-input: 6px;
+  --radius-card: 8px;
+  --radius-bubble: 10px;
+  --radius-dialog: 12px;
+  --radius-full: 9999px;
+
+  /* shadow */
+  --shadow-1: 0 4px 16px rgba(31, 35, 41, 0.08);
+
+  /* layout */
+  --sidebar-width: 56px;
+  --panel-width: 260px;
+  --status-bar-height: 24px;
+  --chat-header-height: 44px;
+  --input-max-height: 200px;
+  --min-window-width: 1120px;
+  --min-window-height: 720px;
+
+  /* sizing */
+  --size-nav-button: 40px;
+  --size-icon-sm: 16px;
+  --size-icon-md: 20px;
+  --size-thumbnail: 96px;
+  --size-thumbnail-video: 160px;
+  --size-nav-indicator: 3px;
+
+  /* motion */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}

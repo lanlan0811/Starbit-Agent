@@ -1,0 +1,25 @@
+appId: com.starbit.harness
+productName: 衔星 Starbit
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**
+  - resources/**
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icons/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: 衔星 Starbit
+publish:
+  provider: generic
+  url: https://example.com/auto-updates
+npmRebuild: true

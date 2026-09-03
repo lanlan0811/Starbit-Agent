@@ -1,0 +1,73 @@
+.tool {
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-body);
+  width: 100%;
+}
+
+.tool__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tool__status {
+  display: inline-flex;
+}
+
+.tool__spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tool__name {
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-mono);
+}
+
+.tool__path {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool__truncated {
+  margin-left: auto;
+  color: var(--color-warning);
+  font-size: var(--font-size-caption);
+}
+
+.tool__details {
+  margin-top: var(--space-2);
+}
+
+.tool__details summary {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  user-select: none;
+}
+
+.tool__content {
+  margin-top: var(--space-2);
+  background: var(--color-bg-inset);
+  border-radius: var(--radius-input);
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
