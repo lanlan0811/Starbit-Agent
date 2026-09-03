@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="112" viewBox="0 0 280 112">
+<style>.t{font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;font-size:16px;font-weight:600;fill:#1F2329}.s{font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;font-size:11.5px;font-weight:400;fill:#6B7280}</style>
+<rect width="280" height="112" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+<rect x="14" y="14" width="88" height="88" rx="20" fill="#E6F6FB"/>
+<g transform="translate(58.0 56.0) scale(2.3478) translate(-0.00 -0.00)">
+  
+  <circle cx="0" cy="0" r="2.05" fill="#61dafb"/>
+  <g stroke="#61dafb" stroke-width="1" fill="none">
+    <ellipse rx="11" ry="4.2"/>
+    <ellipse rx="11" ry="4.2" transform="rotate(60)"/>
+    <ellipse rx="11" ry="4.2" transform="rotate(120)"/>
+  </g>
+</g>
+<text x="118" y="50" class="t">React 18</text>
+<text x="118" y="74" class="s">渲染层</text>
+</svg>

@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#F7F9FE"/>
+      <stop offset="1" stop-color="#EDF2FD"/>
+    </linearGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FBFCFE"/>
+    </linearGradient>
+    <path id="star" d="M12 1.6 C13.4 7.6 16.4 10.6 22.4 12 C16.4 13.4 13.4 16.4 12 22.4 C10.6 16.4 7.6 13.4 1.6 12 C7.6 10.6 10.6 7.6 12 1.6 Z"/>
+  </defs>
+
+  <style>
+    text { font-family:'Segoe UI', system-ui, 'Microsoft YaHei', sans-serif; }
+    .brand-cn { font-size:46px; font-weight:600; fill:#1F2329; }
+    .brand-en { font-size:28px; font-weight:400; fill:#3B6FF0; letter-spacing:.06em; }
+    .base-l { font-size:13px; font-weight:400; fill:#8A94A6; }
+    .base-l2 { font-size:12px; font-weight:400; fill:#A6AEBB; letter-spacing:.08em; }
+    .tagline { font-size:17px; font-weight:400; fill:#3D4653; }
+    .tagline-en { font-size:13.5px; font-weight:400; fill:#8A94A6; }
+    .pill-t { font-size:13px; font-weight:500; fill:#3D4653; }
+    .win-t { font-size:12.5px; font-weight:600; fill:#1F2329; }
+    .win-s { font-size:11px; font-weight:400; fill:#8A94A6; }
+    .win-usr { font-size:12.5px; font-weight:400; fill:#1F2329; }
+    .win-cap { font-size:10.5px; font-weight:400; fill:#6B7280; }
+  </style>
+
+  <!-- backdrop -->
+  <rect x="0" y="0" width="1200" height="560" fill="url(#bg)"/>
+  <use href="#star" x="1030" y="24" transform="scale(4.2)" fill="#3B6FF0" opacity="0.05"/>
+  <use href="#star" x="-180" y="470" transform="scale(3.4)" fill="#8B5CF6" opacity="0.05"/>
+  <circle cx="1150" cy="80" r="190" fill="#3B6FF0" opacity="0.035"/>
+
+  <!-- ============ left / brand ============ -->
+  <g transform="translate(76,96)">
+    <!-- logo -->
+    <rect x="0" y="0" width="92" height="92" rx="22" fill="#3B6FF0"/>
+    <use href="#star" x="34" y="34" fill="#FFFFFF"/>
+    <circle cx="76" cy="16" r="14" fill="#FFFFFF" opacity="0.22"/>
+    <circle cx="18" cy="76" r="7" fill="#FFFFFF" opacity="0.28"/>
+
+    <!-- name : CJK (46px) visual box ~ y2..48 ; EN centred on the same optical centre -->
+    <text x="118" y="42" class="brand-cn">衔星</text>
+    <text x="222" y="32" class="brand-en">Starbit</text>
+    <text x="120" y="72" font-size="14.5" font-weight="600" fill="#8B5CF6" letter-spacing=".14em">桌面 AI AGENT 工作台</text>
+
+    <!-- tagline -->
+    <text x="0" y="140" class="tagline">打开一个工作区，用对话驱动 Agent：处理文件、写代码、</text>
+    <text x="0" y="164" class="tagline">做调研、浏览网页、管理本地知识库。</text>
+    <text x="0" y="196" class="tagline-en">A desktop AI agent workbench for work, study &amp; research · Windows-first, data stays local</text>
+
+    <!-- feature pills -->
+    <g transform="translate(0,232)">
+      <rect x="0"   y="0" width="112" height="34" rx="999" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="56"  y="22" text-anchor="middle" class="pill-t">SKILLS 技能</text>
+      <rect x="124" y="0" width="120" height="34" rx="999" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="184" y="22" text-anchor="middle" class="pill-t">MCP 工具生态</text>
+      <rect x="256" y="0" width="122" height="34" rx="999" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="317" y="22" text-anchor="middle" class="pill-t">三级权限管控</text>
+      <rect x="0" y="46" width="132" height="34" rx="999" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="66" y="68" text-anchor="middle" class="pill-t">本地向量知识库</text>
+      <rect x="144" y="46" width="132" height="34" rx="999" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="210" y="68" text-anchor="middle" class="pill-t">内置可视化浏览器</text>
+      <rect x="288" y="46" width="110" height="34" rx="999" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="343" y="68" text-anchor="middle" class="pill-t">分层记忆</text>
+    </g>
+
+    <!-- footer meta -->
+    <text x="0" y="368" class="base-l2">WINDOWS-FIRST · ELECTRON + TYPESCRIPT</text>
+    <text x="0" y="392" class="base-l">数据全程本地 · 权限三级管控 · 上下文缓存智能压缩</text>
+  </g>
+
+  <!-- ============ right / window mock ============ -->
+  <g transform="translate(612,52)">
+    <!-- shadow -->
+    <rect x="6" y="10" width="530" height="452" rx="18" fill="#1F2329" opacity="0.06"/>
+    <!-- window -->
+    <rect x="0" y="0" width="530" height="452" rx="16" fill="url(#win)" stroke="#E5E7EB"/>
+
+    <!-- header -->
+    <rect x="0" y="0" width="530" height="56" rx="16" fill="#F2F3F5"/>
+    <rect x="0" y="40" width="530" height="16" fill="#F2F3F5"/>
+    <circle cx="22" cy="22" r="6" fill="#F87171"/>
+    <circle cx="42" cy="22" r="6" fill="#FBBF24"/>
+    <circle cx="62" cy="22" r="6" fill="#34D399"/>
+    <rect x="90" y="12" width="210" height="16" rx="8" fill="#E5E7EB"/>
+    <rect x="100" y="17" width="130" height="6" rx="3" fill="#9AA3B2"/>
+    <!-- permission capsule -->
+    <rect x="394" y="12" width="122" height="32" rx="999" fill="#E7F6EC"/>
+    <circle cx="414" cy="28" r="4.5" fill="#16A34A"/>
+    <text x="425" y="32" font-size="12.5" font-weight="600" fill="#16A34A">自动编辑模式</text>
+
+    <!-- body : assistant text -->
+    <rect x="26" y="78" width="150" height="7" rx="3.5" fill="#D6DBE3"/>
+    <rect x="26" y="94" width="300" height="7" rx="3.5" fill="#E2E6EC"/>
+    <rect x="26" y="110" width="262" height="7" rx="3.5" fill="#E2E6EC"/>
+
+    <!-- thinking block -->
+    <rect x="26" y="136" width="478" height="58" rx="10" fill="#F3EDFC"/>
+    <path d="M42 154 L38 158 L42 162" stroke="#8B5CF6" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="54" y="152" class="win-t" fill="#6D4FA0">思考过程</text>
+    <text x="54" y="170" class="win-s" fill="#8B5CF6">已确认修改范围：src/main/permission + core/permission，不动白名单存储</text>
+    <rect x="474" y="158" width="16" height="10" rx="5" fill="#8B5CF6" opacity="0.9"/>
+
+    <!-- tool-call card -->
+    <rect x="26" y="212" width="478" height="62" rx="10" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="26" y="212" width="4" height="62" rx="2" fill="#16A34A"/>
+    <text x="48" y="238" font-family="'Cascadia Code',Consolas,monospace" font-size="12.5" font-weight="600" fill="#1F2329">Edit  src/core/permission/mode.ts</text>
+    <text x="48" y="258" class="win-s">target: 白名单规则持久化 · whitelist.ts</text>
+    <circle cx="480" cy="232" r="9" fill="#E7F6EC"/>
+    <path d="M476.5 232 l3.2 3.2 l5.4 -5.6" stroke="#16A34A" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- user bubble -->
+    <rect x="256" y="296" width="248" height="40" rx="14" fill="#EAF0FE"/>
+    <text x="280" y="320" class="win-usr">好的，开始执行；有写操作先按规则询问</text>
+
+    <!-- usage line -->
+    <text x="26" y="364" class="win-cap">↑ 1,204 tokens (缓存 98.1%) · ↓ 356 · ¥0.021</text>
+
+    <!-- input bar -->
+    <rect x="26" y="380" width="478" height="46" rx="999" fill="#F2F3F5" stroke="#E5E7EB"/>
+    <text x="50" y="408" font-size="13" fill="#9AA3B2">输入消息，输入 / 唤起技能，@ 引用文件…</text>
+    <rect x="470" y="390" width="26" height="26" rx="999" fill="#3B6FF0"/>
+    <path d="M482 400 l8 7 -8 6 z" fill="#FFFFFF"/>
+    <!-- stop variant hidden; keep send -->
+  </g>
+</svg>

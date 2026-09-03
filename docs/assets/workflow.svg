@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 1 L8 5 L0 9 Z" fill="#9AA3B2"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 1 L8 5 L0 9 Z" fill="#3B6FF0"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family:'Segoe UI', system-ui, 'Microsoft YaHei', sans-serif; }
+    .ttl { font-size:24px; font-weight:600; fill:#1F2329; }
+    .sub { font-size:13px; font-weight:400; fill:#8A94A6; }
+    .card-t { font-size:15.5px; font-weight:600; fill:#1F2329; }
+    .card-d { font-size:11.5px; font-weight:400; fill:#6B7280; }
+    .loop { font-size:12px; font-weight:500; fill:#3B6FF0; }
+    .foot { font-size:12.5px; font-weight:400; fill:#6B7280; }
+  </style>
+
+  <!-- backdrop -->
+  <rect x="0" y="0" width="1200" height="520" rx="18" fill="#F7F8FA"/>
+
+  <!-- header -->
+  <g transform="translate(60,42)">
+    <rect x="0" y="0" width="42" height="42" rx="10" fill="#3B6FF0"/>
+    <g transform="translate(21,21)" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round">
+      <path d="M-7 -3.5 h14 M-7 3.5 h14"/>
+      <circle cx="0" cy="-3.5" r="2.6" fill="#FFFFFF" stroke="none"/>
+      <circle cx="0" cy="3.5" r="2.6" fill="#FFFFFF" stroke="none"/>
+      <circle cx="-4" cy="0" r="1.6" fill="#FFFFFF" stroke="none"/>
+      <circle cx="4" cy="0" r="1.6" fill="#FFFFFF" stroke="none"/>
+    </g>
+    <text x="56" y="28" class="ttl">会话主循环</text>
+    <text x="190" y="29" class="sub" style="letter-spacing:.18em;">SESSION MAIN LOOP</text>
+  </g>
+
+  <!-- loop-back dashed arrow from card5 top to card2 top -->
+  <path d="M 1145 158 V 96 H 508 V 128" fill="none" stroke="#3B6FF0" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#arrB)"/>
+  <rect x="700" y="78" width="196" height="24" rx="12" fill="#EAF0FE"/>
+  <text x="798" y="94" text-anchor="middle" class="loop">下一轮 · 可随时 Esc 中断</text>
+
+  <!-- ============ 5 stage cards (w=200 h=248, x from 60, gap 26) ============ -->
+  <!-- x: 60, 286, 512, 738, 964 ; card w 200 => rightmost 1164 -->
+
+  <!-- card 1 : assembly -->
+  <g transform="translate(60,150)">
+    <rect width="200" height="248" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="0" y="0" width="200" height="6" rx="3" fill="#3B6FF0"/>
+    <circle cx="100" cy="52" r="24" fill="#EAF0FE"/>
+    <g transform="translate(100,52)" fill="none" stroke="#3B6FF0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-9 -5 V6 a9 9 0 0 0 18 0 V-5"/>
+      <path d="M-9 -5 h18 M-9 -1 h18"/>
+      <path d="M-4 -9 h8 M-2 -9 v4 M6 -9 v4"/>
+    </g>
+    <text x="100" y="98" text-anchor="middle" class="card-t">上下文组装</text>
+    <text x="100" y="122" text-anchor="middle" font-size="11.5" fill="#8A94A6">Context Assembly</text>
+    <line x1="56" y1="136" x2="144" y2="136" stroke="#E5E7EB"/>
+    <text x="100" y="158" text-anchor="middle" class="card-d">系统提示稳定前缀</text>
+    <text x="100" y="178" text-anchor="middle" class="card-d">memory + AGENTS.md</text>
+    <text x="100" y="198" text-anchor="middle" class="card-d">skills / 工具清单</text>
+    <text x="100" y="218" text-anchor="middle" class="card-d">会话事件日志重放</text>
+  </g>
+  <line x1="262" y1="274" x2="286" y2="274" stroke="#9AA3B2" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- card 2 : LLM -->
+  <g transform="translate(286,150)">
+    <rect width="200" height="248" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="0" y="0" width="200" height="6" rx="3" fill="#8B5CF6"/>
+    <circle cx="100" cy="52" r="24" fill="#F3EDFC"/>
+    <g transform="translate(100,52)" fill="none" stroke="#8B5CF6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="-9" y="-9" width="18" height="18" rx="5"/>
+      <path d="M-3.5 0 a3.5 3.5 0 0 1 7 0 a3.5 3.5 0 0 1 -7 0" />
+      <path d="M0 -5 v-4 M-5 0 h-4 M5 0 h4"/>
+    </g>
+    <text x="100" y="98" text-anchor="middle" class="card-t">模型流式推理</text>
+    <text x="100" y="122" text-anchor="middle" font-size="11.5" fill="#8A94A6">LLM Reasoning</text>
+    <line x1="56" y1="136" x2="144" y2="136" stroke="#E5E7EB"/>
+    <text x="100" y="158" text-anchor="middle" class="card-d">Chat / Responses 双形态</text>
+    <text x="100" y="178" text-anchor="middle" class="card-d">思考强度 low/high/max</text>
+    <text x="100" y="198" text-anchor="middle" class="card-d">并行工具调用解析</text>
+    <text x="100" y="218" text-anchor="middle" class="card-d">usage 缓存字段归一化</text>
+  </g>
+  <line x1="488" y1="274" x2="512" y2="274" stroke="#9AA3B2" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- card 3 : permission -->
+  <g transform="translate(512,150)">
+    <rect width="200" height="248" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="0" y="0" width="200" height="6" rx="3" fill="#D97706"/>
+    <circle cx="100" cy="52" r="24" fill="#FDF2E6"/>
+    <g transform="translate(100,52)" fill="none" stroke="#D97706" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-9 -7 V2 a9 9 0 0 0 18 0 V-7 Z"/>
+      <path d="M0 6 a10 10 0 0 0 10 -10"/>
+      <path d="M-4.5 1.5 l3.4 3.4 5.6 -5.8"/>
+    </g>
+    <text x="100" y="98" text-anchor="middle" class="card-t">权限门控</text>
+    <text x="100" y="122" text-anchor="middle" font-size="11.5" fill="#8A94A6">Permission Gate</text>
+    <line x1="56" y1="136" x2="144" y2="136" stroke="#E5E7EB"/>
+    <text x="100" y="158" text-anchor="middle" class="card-d">PreToolUse hook</text>
+    <text x="100" y="178" text-anchor="middle" class="card-d">三级模式 + 白名单规则</text>
+    <text x="100" y="198" text-anchor="middle" class="card-d">危险指令本地规则库</text>
+    <text x="100" y="218" text-anchor="middle" class="card-d">确认弹窗 · 拒绝回填</text>
+  </g>
+  <line x1="714" y1="274" x2="738" y2="274" stroke="#9AA3B2" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- card 4 : execute -->
+  <g transform="translate(738,150)">
+    <rect width="200" height="248" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="0" y="0" width="200" height="6" rx="3" fill="#16A34A"/>
+    <circle cx="100" cy="52" r="24" fill="#E7F6EC"/>
+    <g transform="translate(100,52)" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 8 C-4 8 -7 3 -7 -2 H-1 V-8 H3 l6 5 -6 5 H2"/>
+      <path d="M-2 -8 v5 M5 -8 v5" transform="translate(-1,-8)"/>
+    </g>
+    <text x="100" y="98" text-anchor="middle" class="card-t">工具执行</text>
+    <text x="100" y="122" text-anchor="middle" font-size="11.5" fill="#8A94A6">Tool Execution</text>
+    <line x1="56" y1="136" x2="144" y2="136" stroke="#E5E7EB"/>
+    <text x="100" y="158" text-anchor="middle" class="card-d">只读并行 / 写入串行</text>
+    <text x="100" y="178" text-anchor="middle" class="card-d">文件 · Shell · 浏览器</text>
+    <text x="100" y="198" text-anchor="middle" class="card-d">MCP · SKILLS · 子代理</text>
+    <text x="100" y="218" text-anchor="middle" class="card-d">超时 + 取消 + 审计</text>
+  </g>
+  <line x1="940" y1="274" x2="964" y2="274" stroke="#9AA3B2" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- card 5 : compact -->
+  <g transform="translate(964,150)">
+    <rect width="200" height="248" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <rect x="0" y="0" width="200" height="6" rx="3" fill="#0E9F8A"/>
+    <circle cx="100" cy="52" r="24" fill="#E0F1EF"/>
+    <g transform="translate(100,52)" fill="none" stroke="#0E9F8A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-9 2 a11 11 0 1 1 22 -11 v-3"/>
+      <path d="M-9 -8 v4 h4"/>
+      <circle cx="2" cy="-4" r="2.2" fill="#0E9F8A" stroke="none"/>
+      <path d="M4.5 -6.5 l6 4" transform="translate(4,3)"/>
+    </g>
+    <text x="100" y="98" text-anchor="middle" class="card-t">上下文检查与压缩</text>
+    <text x="100" y="122" text-anchor="middle" font-size="11.5" fill="#8A94A6">Context Check &amp; Compact</text>
+    <line x1="56" y1="136" x2="144" y2="136" stroke="#E5E7EB"/>
+    <text x="100" y="158" text-anchor="middle" class="card-d">token 占用 90% 预警</text>
+    <text x="100" y="178" text-anchor="middle" class="card-d">97% 硬顶自动压缩</text>
+    <text x="100" y="198" text-anchor="middle" class="card-d">PostToolUse 结果瘦身</text>
+    <text x="100" y="218" text-anchor="middle" class="card-d">前缀哈希自检 · 压缩告知</text>
+  </g>
+
+  <!-- footer -->
+  <g transform="translate(60,446)">
+    <rect x="0" y="0" width="1080" height="40" rx="10" fill="#FFFFFF" stroke="#E5E7EB"/>
+    <g transform="translate(20,20)">
+      <circle cx="0" cy="0" r="5" fill="#3B6FF0"/>
+      <text x="18" y="4" class="foot">每轮事件 append-only 落库（SQLite），UI / resume / 审计均由事件重放驱动</text>
+      <circle cx="452" cy="0" r="5" fill="#0E9F8A"/>
+      <text x="470" y="4" class="foot">全局累计缓存命中率 ≥ 95%（目标 99%）· 用量统计面板逐条标注</text>
+      <circle cx="900" cy="0" r="5" fill="#D97706"/>
+      <text x="918" y="4" class="foot">压缩前弹窗告知缓存失效 · 可取消</text>
+    </g>
+  </g>
+</svg>

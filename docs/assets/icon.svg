@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sheen" cx="0.5" cy="0" r="1.05">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 衔星 Starbit 品牌图标：蓝底圆角方块 + 白色四角星（brand mark） -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#3B6FF0"/>
+  <!-- 顶光柔化顶部、压平底部，图标更沉稳 -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#sheen)"/>
+  <!-- 左上柔和高光 -->
+  <circle cx="96" cy="96" r="170" fill="#FFFFFF" opacity="0.05"/>
+
+  <!-- 四角星 brand mark（与 banner 同源几何，居中对齐 296px） -->
+  <g transform="translate(256 256) scale(14.2308) translate(-12 -12)" fill="#FFFFFF">
+    <path d="M12 1.6 C13.4 7.6 16.4 10.6 22.4 12 C16.4 13.4 13.4 16.4 12 22.4 C10.6 16.4 7.6 13.4 1.6 12 C7.6 10.6 10.6 7.6 12 1.6 Z"/>
+  </g>
+</svg>

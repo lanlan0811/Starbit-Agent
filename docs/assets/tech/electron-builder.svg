@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="112" viewBox="0 0 280 112">
+<style>.t{font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;font-size:16px;font-weight:600;fill:#1F2329}.s{font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;font-size:11.5px;font-weight:400;fill:#6B7280}</style>
+<rect width="280" height="112" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+<rect x="14" y="14" width="88" height="88" rx="20" fill="#EEF2F6"/>
+<g stroke="#475569" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round" transform="translate(44.5 42.5)"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></g>
+<text x="118" y="50" class="t">electron-builder</text>
+<text x="118" y="74" class="s">打包分发 · NSIS</text>
+</svg>
