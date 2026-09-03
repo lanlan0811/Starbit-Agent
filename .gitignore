@@ -1,0 +1,86 @@
+# ---------- Node / 依赖 ----------
+node_modules/
+**/node_modules/
+.pnp
+.pnp.cjs
+.pnp.js
+*.tsbuildinfo
+.eslintcache
+.vite/
+
+# ---------- 构建产物 ----------
+dist/
+dist-electron/
+dist-main/
+dist-preload/
+dist-renderer/
+out/
+.tmp/
+.cache/
+
+# ---------- 打包产物（electron-builder / NSIS） ----------
+release/
+*.exe
+*.msi
+*.nupkg
+*.dmg
+*.pkg
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.blockmap
+latest.yml
+latest-mac.yml
+latest-linux.yml
+builder-debug.yml
+builder-effective-config.yaml
+*-unpacked/
+
+# ---------- 测试产物（Vitest / Playwright） ----------
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# ---------- 日志 ----------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- 环境变量与密钥 ----------
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# ---------- 编辑器 / OS ----------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------- 工作区设计 / 会话产物 ----------
+# UI 设计库缓存（设计工作流生成物，不入库；如需保留设计源稿请删除下行）
+.design_library/
+
+# ZCode/Trae/Codex 会话数据
+.zcode/*
+.trae/*
+.codex/*
+
+# AGENTS.md
+AGENTS.md
