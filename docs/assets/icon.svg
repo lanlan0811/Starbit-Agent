@@ -1,20 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
-    <radialGradient id="sheen" cx="0.5" cy="0" r="1.05">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.10"/>
-      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    <!-- 同色系纵向渐变：品牌蓝 → hover 深蓝，比纯色多一层纵深 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A7CF2"/>
+      <stop offset="0.55" stop-color="#3B6FF0"/>
+      <stop offset="1" stop-color="#2C57CE"/>
+    </linearGradient>
+    <!-- 顶部内侧柔光 -->
+    <radialGradient id="sheen" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
-  <!-- 衔星 Starbit 品牌图标：蓝底圆角方块 + 白色四角星（brand mark） -->
-  <rect x="0" y="0" width="512" height="512" rx="112" fill="#3B6FF0"/>
-  <!-- 顶光柔化顶部、压平底部，图标更沉稳 -->
+  <!-- 背景：圆角方块（品牌蓝渐变） -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
   <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#sheen)"/>
-  <!-- 左上柔和高光 -->
-  <circle cx="96" cy="96" r="170" fill="#FFFFFF" opacity="0.05"/>
 
-  <!-- 四角星 brand mark（与 banner 同源几何，居中对齐 296px） -->
-  <g transform="translate(256 256) scale(14.2308) translate(-12 -12)" fill="#FFFFFF">
+  <!-- 轨道（虚线运行环） -->
+  <g transform="rotate(-10 248 250)">
+    <ellipse cx="248" cy="250" rx="172" ry="150" fill="none"
+             stroke="#FFFFFF" stroke-width="8.5" stroke-opacity="0.85"
+             stroke-dasharray="36 22" stroke-linecap="round"/>
+  </g>
+
+  <!-- 星核光晕 -->
+  <g transform="translate(238 252) scale(11.7) translate(-12 -12)" fill="#FFFFFF" opacity="0.13">
+    <path d="M12 1.6 C13.4 7.6 16.4 10.6 22.4 12 C16.4 13.4 13.4 16.4 12 22.4 C10.6 16.4 7.6 13.4 1.6 12 C7.6 10.6 10.6 7.6 12 1.6 Z"/>
+  </g>
+
+  <!-- 主四角星（衔星核心） -->
+  <g transform="translate(238 252) scale(10.1) translate(-12 -12)" fill="#FFFFFF">
+    <path d="M12 1.6 C13.4 7.6 16.4 10.6 22.4 12 C16.4 13.4 13.4 16.4 12 22.4 C10.6 16.4 7.6 13.4 1.6 12 C7.6 10.6 10.6 7.6 12 1.6 Z"/>
+  </g>
+
+  <!-- 轨道上运行光点（入轨任务） -->
+  <g transform="rotate(-10 248 250)">
+    <circle cx="357" cy="134" r="17" fill="#FFFFFF" opacity="0.28"/>
+    <circle cx="357" cy="134" r="9.5" fill="#FFFFFF"/>
+  </g>
+
+  <!-- 平衡点缀：远角小星 -->
+  <g transform="translate(134 440) scale(2.5) translate(-12 -12)" fill="#FFFFFF" opacity="0.5">
+    <path d="M12 1.6 C13.4 7.6 16.4 10.6 22.4 12 C16.4 13.4 13.4 16.4 12 22.4 C10.6 16.4 7.6 13.4 1.6 12 C7.6 10.6 10.6 7.6 12 1.6 Z"/>
+  </g>
+  <g transform="translate(336 452) scale(1.5) translate(-12 -12)" fill="#FFFFFF" opacity="0.45">
     <path d="M12 1.6 C13.4 7.6 16.4 10.6 22.4 12 C16.4 13.4 13.4 16.4 12 22.4 C10.6 16.4 7.6 13.4 1.6 12 C7.6 10.6 10.6 7.6 12 1.6 Z"/>
   </g>
 </svg>
