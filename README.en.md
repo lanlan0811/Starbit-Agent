@@ -2,7 +2,7 @@
 
 Starbit is a Windows-first desktop AI agent workspace built with Electron, React, and TypeScript. It uses a custom agent loop architecture and connects to models through OpenAI-compatible APIs.
 
-> Status: early development (0.1.0). Local session storage, the permission core, the foundational chat UI, the built-in model catalog, and the provider core are implemented. The agent loop, model settings UI, and complete tool execution pipeline are still in progress.
+> Status: development build (0.1.0). The agent loop, custom models, terminal, browser, knowledge, and memory are integrated. Context compaction and collaboration tools are undergoing full acceptance. Release delivery, cache targets, and vendor multimodal compatibility remain incomplete; see the [acceptance status](docs/en-US/acceptance-status.md).
 
 ## Implemented
 
@@ -15,6 +15,9 @@ Starbit is a Windows-first desktop AI agent workspace built with Electron, React
 - Image/video content conversion and local-media data URL encoding
 - Normalized cache usage, canonical stable-prefix serialization, and SHA-256 diagnostics
 - Vitest unit tests and a Playwright Electron startup test
+- Custom endpoints, context/output limits, and configurable reasoning mappings
+- MCP, Claude Skills, interactive terminal, visual browser, knowledge, and layered memory
+- Cancellable compaction, Task subagents, TodoWrite plan synchronization, and Node/Python execution
 
 ## Development
 

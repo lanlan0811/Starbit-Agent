@@ -7,6 +7,7 @@ import { BrandMark } from '../components/icons/BrandMark'
 import { SecondaryPanel } from '../components/panels/SecondaryPanel'
 import { PermissionDialog } from '../components/permission/PermissionDialog'
 import { RightPanel } from '../components/right-panel/RightPanel'
+import { CompactionDialog } from '../components/permission/CompactionDialog'
 import './app.css'
 
 export default function App(): JSX.Element {
@@ -41,10 +42,20 @@ export default function App(): JSX.Element {
       const state = useAppStore.getState()
       if (ev.type === 'session/event' && ev.sessionId === state.currentSessionId) {
         state.appendEvent(ev.event)
+        if (ev.event.type === 'assistantMessage' || ev.event.type === 'error') state.clearStream()
       } else if (ev.type === 'agent/status' && ev.sessionId === state.currentSessionId) {
         state.setAgentStatus(ev.status)
+        if (ev.status === 'idle') { state.clearStream(); state.setPermissionPrompt(null); state.setCompactionPrompt(null) }
       } else if (ev.type === 'permission/request' && ev.sessionId === state.currentSessionId) {
         state.setPermissionPrompt(ev.request)
+      } else if (ev.type === 'compaction/request' && ev.sessionId === state.currentSessionId) {
+        state.setCompactionPrompt(ev.request)
+      } else if (ev.type === 'agent/delta' && ev.sessionId === state.currentSessionId) {
+        state.appendStreamDelta(ev)
+      } else if (ev.type === 'context/status' && ev.sessionId === state.currentSessionId) {
+        state.setContextStatus(ev.status)
+      } else if (ev.type === 'cache/diagnostic' && ev.sessionId === state.currentSessionId) {
+        state.setCacheDiagnostic(ev.diagnostic)
       } else if (ev.type === 'session/created') {
         state.setSessions([ev.session, ...state.sessions])
       }
@@ -61,6 +72,7 @@ export default function App(): JSX.Element {
       <StatusBar />
       <BrandMark className="starbit-shell__badge" />
       <PermissionDialog />
+      <CompactionDialog />
     </div>
   )
 }

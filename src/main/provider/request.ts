@@ -21,7 +21,7 @@ export async function prepareProviderRequest(
   request: ProviderRequest,
   resolveMedia: MediaResolver = resolveMediaSource
 ): Promise<PreparedProviderRequest> {
-  if (!request.apiKey.trim()) throw new Error('模型 API Key 不能为空')
+  if (request.model.apiKeyRequired !== false && !request.apiKey.trim()) throw new Error('模型 API Key 不能为空')
 
   const apiShape = request.model.apiShape
   const body = await buildBody(request, resolveMedia)
@@ -31,7 +31,7 @@ export async function prepareProviderRequest(
     init: {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${request.apiKey}`,
+        ...(request.apiKey.trim() ? { authorization: `Bearer ${request.apiKey}` } : {}),
         'content-type': 'application/json'
       },
       body: canonicalJson(body),
@@ -51,9 +51,9 @@ async function buildBody(request: ProviderRequest, resolveMedia: MediaResolver):
   const thinking = request.model.thinking[request.thinkingLevel]
   const maxTokens = Math.min(
     request.model.contextWindow,
-    thinking.boostMaxTokens
+    request.maxOutputTokens ?? (thinking.boostMaxTokens
       ? request.model.maxOutputTokens
-      : Math.min(request.maxOutputTokens ?? request.model.maxOutputTokens, request.model.maxOutputTokens)
+      : request.model.maxOutputTokens)
   )
   const sampling = filterSampling(request.sampling ?? {}, request.model.samplingWhitelist)
   const messages = appendPromptHint(request.messages, thinking.promptHint)
@@ -67,7 +67,7 @@ async function buildBody(request: ProviderRequest, resolveMedia: MediaResolver):
   if (request.promptCacheKey) body.prompt_cache_key = request.promptCacheKey
 
   if (request.model.apiShape === 'responses') {
-    body.input = await Promise.all(messages.map((message) => toResponsesMessage(message, resolveMedia)))
+    body.input = (await Promise.all(messages.map((message) => toResponsesItems(message, resolveMedia)))).flat()
     body.max_output_tokens = maxTokens
     if (request.tools?.length) body.tools = request.tools.map(toResponsesTool)
   } else {
@@ -109,6 +109,7 @@ async function toChatMessage(message: ProviderMessage, resolveMedia: MediaResolv
         : await Promise.all(message.content.map((part) => toChatContentPart(part, resolveMedia)))
   }
   if (message.name) value.name = message.name
+  if (message.reasoningContent) value.reasoning_content = message.reasoningContent
   if (message.toolCallId) value.tool_call_id = message.toolCallId
   if (message.toolCalls?.length) {
     value.tool_calls = message.toolCalls.map((call) => ({
@@ -135,6 +136,15 @@ async function toResponsesMessage(message: ProviderMessage, resolveMedia: MediaR
         ? message.content
         : await Promise.all(message.content.map((part) => toResponsesContentPart(part, resolveMedia)))
   }
+}
+
+async function toResponsesItems(message: ProviderMessage, resolveMedia: MediaResolver): Promise<JsonValue[]> {
+  const items: JsonValue[] = []
+  if (message.content || !message.toolCalls?.length) items.push(await toResponsesMessage(message, resolveMedia))
+  for (const call of message.toolCalls ?? []) {
+    items.push({ type: 'function_call', call_id: call.id, name: call.name, arguments: call.arguments })
+  }
+  return items
 }
 
 async function toChatContentPart(part: ContentPart, resolveMedia: MediaResolver): Promise<JsonValue> {

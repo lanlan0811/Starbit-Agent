@@ -73,6 +73,12 @@ export class PromptAssembler {
   }
 }
 
+/** 为子代理等内置角色加载 docs/prompts 中的系统模板。 */
+export async function assemblePromptTemplate(name: string, values: Record<string, string>): Promise<string> {
+  if (!/^[a-z0-9][a-z0-9-]*\.md$/i.test(name)) throw new Error('系统提示模板名称无效')
+  return interpolate(await readFile(join(findPromptRoot(), name), 'utf8'), values).trim()
+}
+
 export function interpolate(template: string, values: Record<string, string>): string {
   return template.replace(/\{\{([a-zA-Z][a-zA-Z0-9]*)\}\}/g, (_match, key: string) => values[key] ?? '')
 }

@@ -61,7 +61,7 @@ Acceptance requires every external result to retain an `<untrusted-data>` bounda
 
 ## M4: Context, subagents, and release
 
-Status: planned.
+Status: core capabilities are being integrated. See [acceptance status](acceptance-status.md) for outstanding work and evidence.
 
 Target scope:
 

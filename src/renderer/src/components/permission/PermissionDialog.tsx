@@ -13,9 +13,9 @@ export function PermissionDialog(): JSX.Element | null {
 
   const respond = async (outcome: 'allow' | 'deny', scope: RuleScope): Promise<void> => {
     setBusy(true)
+    setRequest(null)
     try {
       await window.starbit.permission.respond(request.requestId, outcome, scope)
-      setRequest(null)
     } finally {
       setBusy(false)
     }

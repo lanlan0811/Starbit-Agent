@@ -6,7 +6,7 @@ import './input.css'
 export function InputArea(): JSX.Element {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<{ kind: 'image' | 'video'; source: string; name: string }[]>([])
-  const running = useAppStore((s) => s.agentStatus === 'running')
+  const running = useAppStore((s) => s.agentStatus !== 'idle')
   const models = useAppStore((s) => s.models)
   const currentModel = useAppStore((s) => s.currentModel)
   const setModel = useAppStore((s) => s.setModel)
@@ -52,6 +52,7 @@ export function InputArea(): JSX.Element {
     setAttachments([])
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     useAppStore.getState().setAgentStatus('running')
+    useAppStore.getState().clearStream()
     try {
       await window.starbit.agent.send(sessionId, message, contentParts, thinkingLevel)
     } catch {

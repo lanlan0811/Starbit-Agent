@@ -1,16 +1,10 @@
-import type { ContentPart } from '@core/events'
+import type { ContextMessage } from '@core/context'
 import type { ApiShape, ModelConfig, ThinkingLevel } from '@core/models'
 import type { JsonValue } from '@core/types'
 
 export type ProviderRole = 'system' | 'developer' | 'user' | 'assistant' | 'tool'
 
-export interface ProviderMessage {
-  role: ProviderRole
-  content: string | ContentPart[]
-  name?: string
-  toolCallId?: string
-  toolCalls?: ProviderAssistantToolCall[]
-}
+export type ProviderMessage = ContextMessage
 
 export interface ProviderAssistantToolCall {
   id: string

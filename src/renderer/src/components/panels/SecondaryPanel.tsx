@@ -5,6 +5,7 @@ import type { PermissionRule } from '@core/permission/rules'
 import { useAppStore } from '../../stores/app'
 import { KnowledgePanel } from './KnowledgePanel'
 import { MemoryPanel } from './MemoryPanel'
+import { ModelEditor } from './ModelEditor'
 import './panels.css'
 
 const TITLES: Record<string, string> = {
@@ -173,6 +174,7 @@ function SettingsPanel(): JSX.Element {
         <input value={shellArgs} onChange={(event) => setShellArgs(event.target.value)} />
         <button className="panel-button" onClick={() => void saveShell()}><Save size={14} /> 保存 Shell</button>
       </section>
+      <ModelEditor />
       <section className="settings-group">
         <h3><ShieldCheck size={15} /> 权限白名单</h3>
         <div className="settings-rule-list">

@@ -3,6 +3,13 @@ import type { SessionMeta } from '@core/session'
 import type { SessionEvent, PermissionMode } from '@core/events'
 import type { ModelConfig } from '@core/models'
 import type { ThinkingLevel } from '@core/models'
+import type { CacheDiagnostic, CompactionConfirmationRequest } from '../../../main/agent/loop'
+import type { ContextStatus } from '../../../main/agent/context'
+
+interface CompactionPromptState extends CompactionConfirmationRequest {
+  requestId: string
+  sessionId: string
+}
 
 export interface PermissionPromptState {
   requestId: string
@@ -30,6 +37,11 @@ interface AppState {
   thinkingLevel: ThinkingLevel
   activeSection: string
   permissionPrompt: PermissionPromptState | null
+  compactionPrompt: CompactionPromptState | null
+  streamingText: string
+  streamingThinking: string
+  contextStatus: ContextStatus | null
+  cacheDiagnostic: CacheDiagnostic | null
   rightPanel: 'browser' | 'terminal' | null
   setReady: (v: boolean) => void
   setAppVersion: (v: string) => void
@@ -45,6 +57,11 @@ interface AppState {
   setThinkingLevel: (level: ThinkingLevel) => void
   setActiveSection: (section: string) => void
   setPermissionPrompt: (request: PermissionPromptState | null) => void
+  setCompactionPrompt: (request: CompactionPromptState | null) => void
+  appendStreamDelta: (delta: { text?: string; thinking?: string }) => void
+  clearStream: () => void
+  setContextStatus: (status: ContextStatus | null) => void
+  setCacheDiagnostic: (diagnostic: CacheDiagnostic | null) => void
   setRightPanel: (panel: AppState['rightPanel']) => void
 }
 
@@ -62,13 +79,19 @@ export const useAppStore = create<AppState>((set) => ({
   thinkingLevel: 'max',
   activeSection: 'sessions',
   permissionPrompt: null,
+  compactionPrompt: null,
+  streamingText: '',
+  streamingThinking: '',
+  contextStatus: null,
+  cacheDiagnostic: null,
   rightPanel: null,
   setReady: (v) => set({ ready: v }),
   setAppVersion: (v) => set({ appVersion: v }),
   setWorkspacePath: (p) => set({ workspacePath: p }),
   setSessions: (s) => set({ sessions: s }),
   setCurrentSessionId: (id, events) =>
-    set({ currentSessionId: id, events: events ?? (id ? useAppStore.getState().events : []) }),
+    set({ currentSessionId: id, events: events ?? [], streamingText: '', streamingThinking: '', contextStatus: null, cacheDiagnostic: null,
+      permissionPrompt: null, compactionPrompt: null, agentStatus: 'idle' }),
   setEvents: (e) => set({ events: e }),
   appendEvent: (e) => set((s) => ({ events: [...s.events, e] })),
   setModels: (m) => set({ models: m }),
@@ -78,5 +101,13 @@ export const useAppStore = create<AppState>((set) => ({
   setThinkingLevel: (level) => set({ thinkingLevel: level }),
   setActiveSection: (section) => set({ activeSection: section }),
   setPermissionPrompt: (request) => set({ permissionPrompt: request }),
+  setCompactionPrompt: (request) => set({ compactionPrompt: request }),
+  appendStreamDelta: (delta) => set((state) => ({
+    streamingText: `${state.streamingText}${delta.text ?? ''}`,
+    streamingThinking: `${state.streamingThinking}${delta.thinking ?? ''}`
+  })),
+  clearStream: () => set({ streamingText: '', streamingThinking: '' }),
+  setContextStatus: (status) => set({ contextStatus: status }),
+  setCacheDiagnostic: (diagnostic) => set({ cacheDiagnostic: diagnostic }),
   setRightPanel: (panel) => set({ rightPanel: panel })
 }))

@@ -37,7 +37,7 @@ export function matchDangerousRule(
   command: string,
   rules: DangerousRule[] = BUILTIN_DANGEROUS_RULES
 ): DangerousRule | undefined {
-  for (const rule of rules) {
+  for (const rule of [...rules].sort((a, b) => Number(b.severity === 'block') - Number(a.severity === 'block'))) {
     try {
       const re = new RegExp(rule.pattern, 'i')
       if (re.test(command)) return rule

@@ -10,6 +10,9 @@ import type { BrowserBounds, BrowserControlMode, BrowserDownloadState, BrowserSt
 import type { KnowledgeBaseRecord, KnowledgeDocumentRecord, KnowledgeSearchHit } from '../knowledge/types'
 import type { KnowledgeSettings } from '../agent/manager'
 import type { MemoryEntry, MemoryScope, MemorySearchHit } from '../memory/types'
+import type { CacheDiagnostic } from '../agent/loop'
+import type { ContextStatus } from '../agent/context'
+import type { CompactionPromptDto } from '../agent/manager'
 
 /**
  * IPC API 契约 —— 主进程暴露给渲染进程的能力。
@@ -35,6 +38,8 @@ export interface IpcApi {
   }
   models: {
     list(): Promise<ModelConfig[]>
+    save(model: ModelConfig): Promise<ModelConfig[]>
+    delete(id: string): Promise<ModelConfig[]>
     configured(): Promise<Record<string, boolean>>
     setApiKey(modelId: string, apiKey: string): Promise<void>
     testConnection(modelId: string): Promise<{ ok: boolean; latencyMs: number; message: string }>
@@ -42,6 +47,7 @@ export interface IpcApi {
   agent: {
     send(sessionId: string, content: string, attachments?: ContentPart[], thinkingLevel?: ThinkingLevel): Promise<void>
     cancel(sessionId: string): Promise<void>
+    respondCompaction(requestId: string, accepted: boolean): Promise<boolean>
   }
   permission: {
     respond(requestId: string, outcome: 'allow' | 'deny', scope: RuleScope, reason?: string): Promise<boolean>
@@ -157,6 +163,10 @@ export type MainToRendererEvent =
   | { type: 'session/created'; session: SessionMeta }
   | { type: 'agent/status'; sessionId: string; status: 'idle' | 'running' | 'waiting-confirmation' }
   | { type: 'permission/request'; sessionId: string; request: PermissionPromptDto }
+  | { type: 'compaction/request'; sessionId: string; request: CompactionPromptDto }
+  | { type: 'agent/delta'; sessionId: string; text?: string; thinking?: string }
+  | { type: 'context/status'; sessionId: string; status: ContextStatus }
+  | { type: 'cache/diagnostic'; sessionId: string; diagnostic: CacheDiagnostic }
   | { type: 'terminal/data'; terminalId: string; data: string }
   | { type: 'terminal/ready'; terminalId: string; pid: number }
   | { type: 'terminal/exit'; terminalId: string; exitCode: number; signal?: number }

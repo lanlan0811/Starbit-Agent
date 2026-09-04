@@ -63,6 +63,15 @@ export class ToolRegistry {
     return result
   }
 
+  /** 派生共享执行器的隔离工具视图，供子代理白名单使用。 */
+  fork(allow: (definition: ToolDefinition) => boolean): ToolRegistry {
+    const forked = new ToolRegistry()
+    for (const registration of this.tools.values()) {
+      if (registration.enabled && allow(registration.def)) forked.register(registration.def, registration.executor)
+    }
+    return forked
+  }
+
   /** 执行一个工具调用 */
   async execute(fullName: string, input: ToolInput, ctx: ToolContext): Promise<ToolResult> {
     const reg = this.tools.get(fullName)
@@ -122,7 +131,8 @@ export function isAllowedByMode(def: ToolDefinition, mode: PermissionMode): bool
     case 'skill':
     case 'memory':
     case 'kb':
-      return def.readOnly === true
+      // 披露能力，真正执行前仍需权限引擎确认。
+      return true
     case 'browser':
       // 自动编辑模式可向模型披露浏览器写操作，运行时由 PermissionService 统一询问。
       return true

@@ -122,6 +122,10 @@
   background: var(--color-cache-hit);
 }
 
+.statusbar__dot--neutral {
+  background: var(--color-text-secondary);
+}
+
 .statusbar__dot--yellow {
   background: var(--color-warning);
 }

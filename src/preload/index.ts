@@ -14,13 +14,16 @@ const api: IpcApi = {
   },
   models: {
     list: () => ipcRenderer.invoke('models:list'),
+    save: (model) => ipcRenderer.invoke('models:save', model),
+    delete: (id) => ipcRenderer.invoke('models:delete', id),
     configured: () => ipcRenderer.invoke('models:configured'),
     setApiKey: (modelId, apiKey) => ipcRenderer.invoke('models:setApiKey', modelId, apiKey),
     testConnection: (modelId) => ipcRenderer.invoke('models:testConnection', modelId)
   },
   agent: {
     send: (sessionId, content, attachments, thinkingLevel) => ipcRenderer.invoke('agent:send', sessionId, content, attachments, thinkingLevel),
-    cancel: (sessionId) => ipcRenderer.invoke('agent:cancel', sessionId)
+    cancel: (sessionId) => ipcRenderer.invoke('agent:cancel', sessionId),
+    respondCompaction: (requestId, accepted) => ipcRenderer.invoke('agent:respondCompaction', requestId, accepted)
   },
   permission: {
     respond: (requestId, outcome, scope, reason) => ipcRenderer.invoke('permission:respond', requestId, outcome, scope, reason),

@@ -1,4 +1,6 @@
 import { join } from 'node:path'
+import { app } from 'electron'
+import { loadDangerousRules } from '../security/dangerous-rules'
 import type { ContentPart, ErrorEvent, PermissionMode, SessionEvent, UsageEvent } from '@core/events'
 import { BUILTIN_MODELS, getModel, type ModelConfig, type ThinkingLevel } from '@core/models'
 import { nanoid } from '@core/nanoid'
@@ -7,7 +9,7 @@ import { BUILTIN_DANGEROUS_RULES } from '@core/permission/dangerous-rules'
 import type { RuleScope } from '@core/permission/rules'
 import { AgentLoop, type PermissionConfirmationRequest, type PermissionResponse } from './loop'
 import { OpenAiCompatibleProvider } from '../provider/openai-provider'
-import { PromptAssembler } from '../prompts/assembler'
+import { PromptAssembler, assemblePromptTemplate } from '../prompts/assembler'
 import { redact } from '../security/redact'
 import { SettingsService } from '../security/settings'
 import { getUsageSummary, listAudit, listWhitelist, recordUsage, upsertWhitelist, writeAudit } from '../session/database'
@@ -26,6 +28,14 @@ import type { KnowledgeBaseRecord, KnowledgeDocumentRecord, KnowledgeSearchHit }
 import { MemoryStore } from '../memory/store'
 import { registerMemoryTools } from '../memory/tools'
 import type { MemoryEntry, MemoryScope, MemorySearchHit } from '../memory/types'
+import type { ToolRegistry } from '@core/tools/registry'
+import { canonicalJson, PrefixFingerprintTracker } from '../provider/canonical'
+import { validateModelConfig } from '@core/model-validation'
+import type { CacheDiagnostic, CompactionConfirmationRequest } from './loop'
+import { registerTodoTools } from '../tools/todo'
+import { registerSandboxTools } from '../tools/sandbox'
+import { registerTaskTools, type SubagentRequest, type SubagentResult } from '../tools/task'
+import type { ToolContext } from '@core/tools/types'
 
 export interface PermissionPromptDto {
   requestId: string
@@ -42,12 +52,38 @@ export interface PermissionPromptDto {
 interface PendingPermission {
   sessionId: string
   resolve: (response: PermissionResponse) => void
+  request: PermissionPromptDto
+}
+
+export interface CompactionPromptDto extends CompactionConfirmationRequest {
+  requestId: string
+  sessionId: string
+}
+
+interface PendingCompaction {
+  sessionId: string
+  resolve: (accepted: boolean) => void
+}
+
+interface SessionRuntime {
+  model: ModelConfig
+  registry: ToolRegistry
+  memory: MemoryStore
+  skills: SkillManager
+  permissions: PermissionService
+  hooks: HookRunner
+  systemPrompt: string
+  skillsIndex: string
 }
 
 export type AgentEventSink =
   | { type: 'session/event'; sessionId: string; event: SessionEvent }
   | { type: 'agent/status'; sessionId: string; status: 'idle' | 'running' | 'waiting-confirmation' }
   | { type: 'permission/request'; sessionId: string; request: PermissionPromptDto }
+  | { type: 'compaction/request'; sessionId: string; request: CompactionPromptDto }
+  | { type: 'agent/delta'; sessionId: string; text?: string; thinking?: string }
+  | { type: 'context/status'; sessionId: string; status: import('./context').ContextStatus }
+  | { type: 'cache/diagnostic'; sessionId: string; diagnostic: CacheDiagnostic }
 
 export interface KnowledgeSettings {
   mode: EmbeddingMode
@@ -67,11 +103,16 @@ interface StoredKnowledgeSettings {
 /** 管理每个会话的 AgentLoop、取消和权限确认生命周期。 */
 export class AgentManager {
   private readonly active = new Map<string, AgentLoop>()
+  private readonly starting = new Set<string>()
+  private readonly cancelledStarts = new Set<string>()
   private readonly pendingPermissions = new Map<string, PendingPermission>()
+  private readonly pendingCompactions = new Map<string, PendingCompaction>()
   private readonly provider = new OpenAiCompatibleProvider()
   private readonly mcp = new McpManager()
   private readonly knowledgeStores = new Map<string, Promise<KnowledgeStore>>()
   private readonly memoryStores = new Map<string, MemoryStore>()
+  private readonly sessionRuntimes = new Map<string, Promise<SessionRuntime>>()
+  private readonly prefixTrackers = new Map<string, PrefixFingerprintTracker>()
 
   constructor(
     private readonly sessions: SessionManager,
@@ -81,50 +122,21 @@ export class AgentManager {
   ) {}
 
   async send(sessionId: string, content: string, attachments: ContentPart[] = [], thinkingLevel: ThinkingLevel = 'max'): Promise<void> {
-    if (this.active.has(sessionId)) throw new Error('当前会话已有任务正在运行')
+    if (this.active.has(sessionId) || this.starting.has(sessionId)) throw new Error('当前会话已有任务正在运行')
     const session = this.sessions.get(sessionId)
     if (!session) throw new Error(`会话不存在: ${sessionId}`)
+    this.starting.add(sessionId)
     this.push({ type: 'agent/status', sessionId, status: 'running' })
     let loop: AgentLoop | null = null
     try {
-      const model = this.resolveModel(session.model)
+      const runtime = await this.getSessionRuntime(session, thinkingLevel)
+      if (this.cancelledStarts.has(sessionId)) throw new Error('任务已取消。')
+      const { model, registry, memory, skills, permissions, hooks } = runtime
       const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
-      if (!apiKey) throw new Error(`模型 ${model.id} 尚未配置 API Key，请在设置中完成配置。`)
-      const registry = createBuiltinToolRegistry({ shell: this.resolveShell() })
-      if (this.browser) registerBrowserTools(registry, this.browser)
-      const [knowledge, memory] = await Promise.all([
-        this.getKnowledgeStore(session.workspacePath),
-        Promise.resolve(this.getMemoryStore(session.workspacePath))
-      ])
-      registerKnowledgeTools(registry, knowledge)
-      registerMemoryTools(registry, memory)
-      const mcpConfigs = this.materializeMcpConfigs(this.settings.getJson<McpServerConfig[]>('mcpServers', []))
-      await this.mcp.synchronize(mcpConfigs)
-      this.mcp.registerTools(registry)
-      const skills = new SkillManager({ workspacePath: session.workspacePath })
-      await skills.scan()
-      skills.registerTools(registry)
-      const permissions = new PermissionService(BUILTIN_DANGEROUS_RULES)
+      if (!apiKey && model.apiKeyRequired !== false) throw new Error(`模型 ${model.id} 尚未配置 API Key，请在设置中完成配置。`)
       permissions.setMode(session.mode)
       permissions.setRules(listWhitelist())
-      const [memoryContext, directSkillContext] = await Promise.all([
-        memory.loadContext(),
-        skills.directContext(content)
-      ])
-      const assembled = await new PromptAssembler({
-        workspacePath: session.workspacePath,
-        os: `${process.platform} ${process.arch}`,
-        shell: this.resolveShell().executable,
-        model: model.id,
-        thinkingLevel,
-        mode: session.mode,
-        tools: registry.listForMode(session.mode),
-        projectRules: memoryContext.projectRules,
-        memorySection: formatMemorySection(memoryContext.userMemory, memoryContext.workspaceMemory),
-        skillsIndex: skills.index()
-      }).assemble()
-      const hooks = new HookRunner()
-      hooks.setHooks(this.settings.getJson<HookDefinition[]>('hooks', []))
+      const directSkillContext = content.trim() === '/compact' ? '' : await skills.directContext(content)
       const promptHook = await hooks.run('UserPromptSubmit', {
         sessionId,
         workspacePath: session.workspacePath,
@@ -132,20 +144,26 @@ export class AgentManager {
       })
       if (!promptHook.allowed) throw new Error(promptHook.messages.join('\n') || 'UserPromptSubmit Hook 已阻断消息')
       const hookedPrompt = asPromptPayload(promptHook.payload, content, attachments)
+      if (this.cancelledStarts.has(sessionId)) throw new Error('任务已取消。')
       loop = new AgentLoop({
         sessionId,
         workspacePath: session.workspacePath,
         model,
         apiKey,
         thinkingLevel,
-        systemPrompt: assembled.systemPrompt,
-        skillsIndex: assembled.skillsIndex,
+        systemPrompt: runtime.systemPrompt,
+        skillsIndex: runtime.skillsIndex,
         registry,
         permissions,
         provider: this.provider,
         initialEvents: this.sessions.replay(sessionId),
+        prefixTracker: this.getPrefixTracker(sessionId),
         onEvent: (event) => this.recordEvent(event),
+        onDelta: (delta) => this.push({ type: 'agent/delta', sessionId, ...delta }),
+        onContextStatus: (status) => this.push({ type: 'context/status', sessionId, status }),
+        onCacheDiagnostic: (diagnostic) => this.push({ type: 'cache/diagnostic', sessionId, diagnostic }),
         confirm: (request) => this.requestPermission(sessionId, request),
+        confirmCompaction: (request) => this.requestCompaction(sessionId, request),
         onRuleChange: upsertWhitelist,
         beforeToolUse: async (call) => {
           const result = await hooks.run('PreToolUse', { sessionId, workspacePath: session.workspacePath, payload: call })
@@ -157,9 +175,14 @@ export class AgentManager {
             workspacePath: session.workspacePath,
             payload: { call, result: result instanceof Error ? { error: result.message } : result }
           })
+        },
+        beforeCompact: async (request) => {
+          const result = await hooks.run('PreCompact', { sessionId, workspacePath: session.workspacePath, payload: request })
+          return { allowed: result.allowed, reason: result.messages.join('\n') }
         }
       })
       this.active.set(sessionId, loop)
+      this.starting.delete(sessionId)
       await hooks.run('SessionStart', { sessionId, workspacePath: session.workspacePath, payload: { resumed: this.sessions.replay(sessionId).length > 0 } })
       await loop.run(
         hookedPrompt.content,
@@ -172,17 +195,26 @@ export class AgentManager {
       if (!loop) this.recordEvent(this.errorEvent(sessionId, error))
       throw error
     } finally {
+      this.starting.delete(sessionId)
+      this.cancelledStarts.delete(sessionId)
       this.active.delete(sessionId)
       this.push({ type: 'agent/status', sessionId, status: 'idle' })
     }
   }
 
   cancel(sessionId: string): void {
+    if (this.starting.has(sessionId)) this.cancelledStarts.add(sessionId)
     this.active.get(sessionId)?.cancel()
     for (const [requestId, pending] of this.pendingPermissions) {
       if (pending.sessionId === sessionId) {
         pending.resolve({ outcome: 'deny', scope: 'once', reason: '任务已取消' })
         this.pendingPermissions.delete(requestId)
+      }
+    }
+    for (const [requestId, pending] of this.pendingCompactions) {
+      if (pending.sessionId === sessionId) {
+        pending.resolve(false)
+        this.pendingCompactions.delete(requestId)
       }
     }
   }
@@ -192,6 +224,17 @@ export class AgentManager {
     if (!pending) return false
     pending.resolve({ outcome, scope, reason })
     this.pendingPermissions.delete(requestId)
+    const next = [...this.pendingPermissions.values()].find((item) => item.sessionId === pending.sessionId)
+    if (next?.request) this.push({ type: 'permission/request', sessionId: pending.sessionId, request: next.request })
+    else this.push({ type: 'agent/status', sessionId: pending.sessionId, status: 'running' })
+    return true
+  }
+
+  respondCompaction(requestId: string, accepted: boolean): boolean {
+    const pending = this.pendingCompactions.get(requestId)
+    if (!pending) return false
+    pending.resolve(accepted)
+    this.pendingCompactions.delete(requestId)
     this.push({ type: 'agent/status', sessionId: pending.sessionId, status: 'running' })
     return true
   }
@@ -205,13 +248,38 @@ export class AgentManager {
   }
 
   setModelApiKey(modelId: string, apiKey: string): void {
-    if (!getModel(modelId)) throw new Error(`未知模型: ${modelId}`)
+    if (!this.listModels().some((model) => model.id === modelId)) throw new Error(`未知模型: ${modelId}`)
     this.settings.setSecret(`model:${modelId}:apiKey`, apiKey.trim())
     writeAudit('model-api-key-updated', JSON.stringify({ modelId, configured: Boolean(apiKey.trim()) }))
   }
 
   isModelConfigured(modelId: string): boolean {
     return this.settings.hasSecret(`model:${modelId}:apiKey`) || Boolean(process.env.STARBIT_API_KEY)
+  }
+
+  listModels(): ModelConfig[] {
+    const custom = this.settings.getJson<ModelConfig[]>('customModels', [])
+    return [...BUILTIN_MODELS.map((model) => ({
+      ...model, ...this.settings.getJson<Partial<ModelConfig>>(`model:${model.id}:override`, {}), id: model.id, custom: false
+    })), ...custom]
+  }
+
+  saveModel(value: ModelConfig): ModelConfig[] {
+    const model = validateModelConfig(value)
+    if (getModel(model.id)) this.settings.setJson(`model:${model.id}:override`, { ...model, custom: false })
+    else {
+      const custom = this.settings.getJson<ModelConfig[]>('customModels', []).filter((item) => item.id !== model.id)
+      this.settings.setJson('customModels', [...custom, { ...model, custom: true }])
+    }
+    writeAudit('model-config-updated', JSON.stringify({ id: model.id, apiShape: model.apiShape }))
+    return this.listModels()
+  }
+
+  deleteModel(id: string): ModelConfig[] {
+    if (getModel(id)) this.settings.setJson(`model:${id}:override`, {})
+    else this.settings.setJson('customModels', this.settings.getJson<ModelConfig[]>('customModels', []).filter((item) => item.id !== id))
+    writeAudit('model-config-removed', JSON.stringify({ id }))
+    return this.listModels()
   }
 
   getShell(): ShellSettings {
@@ -263,6 +331,8 @@ export class AgentManager {
     const stores = await Promise.allSettled(this.knowledgeStores.values())
     await Promise.allSettled(stores.flatMap((result) => result.status === 'fulfilled' ? [result.value.close()] : []))
     this.knowledgeStores.clear()
+    this.sessionRuntimes.clear()
+    this.prefixTrackers.clear()
     await this.mcp.close()
   }
 
@@ -379,7 +449,7 @@ export class AgentManager {
   async testModel(modelId: string): Promise<{ ok: boolean; latencyMs: number; message: string }> {
     const model = this.resolveModel(modelId)
     const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
-    if (!apiKey) return { ok: false, latencyMs: 0, message: '尚未配置 API Key' }
+    if (!apiKey && model.apiKeyRequired !== false) return { ok: false, latencyMs: 0, message: '尚未配置 API Key' }
     const startedAt = Date.now()
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15000)
@@ -403,9 +473,171 @@ export class AgentManager {
   }
 
   private resolveModel(id: string): ModelConfig {
-    const fallback = getModel(id) ?? getModel('qwen3.8-max') ?? BUILTIN_MODELS[0]
-    const override = this.settings.getJson<Partial<ModelConfig>>(`model:${fallback.id}:override`, {})
-    return { ...fallback, ...override, id: fallback.id, thinking: override.thinking ?? fallback.thinking }
+    const selected = this.listModels().find((model) => model.id === id || (!id && model.id === 'qwen3.8-max'))
+    if (!selected) throw new Error(`模型不存在：${id}，请在设置中选择可用模型。`)
+    return selected
+  }
+
+  private async getSessionRuntime(
+    session: NonNullable<ReturnType<SessionManager['get']>>,
+    thinkingLevel: ThinkingLevel
+  ): Promise<SessionRuntime> {
+    const existing = this.sessionRuntimes.get(session.id)
+    if (existing) {
+      const runtime = await existing
+      if (canonicalJson(runtime.model as unknown as import('@core/types').JsonValue) === canonicalJson(this.resolveModel(session.model) as unknown as import('@core/types').JsonValue)) return runtime
+      this.sessionRuntimes.delete(session.id)
+      this.prefixTrackers.delete(session.id)
+    }
+    const pending = this.createSessionRuntime(session, thinkingLevel)
+    this.sessionRuntimes.set(session.id, pending)
+    try {
+      return await pending
+    } catch (error) {
+      this.sessionRuntimes.delete(session.id)
+      throw error
+    }
+  }
+
+  private async createSessionRuntime(
+    session: NonNullable<ReturnType<SessionManager['get']>>,
+    thinkingLevel: ThinkingLevel
+  ): Promise<SessionRuntime> {
+    const model = this.resolveModel(session.model)
+    const registry = createBuiltinToolRegistry({ shell: this.resolveShell() })
+    if (this.browser) registerBrowserTools(registry, this.browser)
+    const [knowledge, memory] = await Promise.all([
+      this.getKnowledgeStore(session.workspacePath),
+      Promise.resolve(this.getMemoryStore(session.workspacePath))
+    ])
+    registerKnowledgeTools(registry, knowledge)
+    registerMemoryTools(registry, memory)
+    registerTodoTools(registry)
+    registerSandboxTools(registry, {
+      nodeExecutable: process.execPath,
+      pythonExecutable: this.settings.getString('sandbox:pythonExecutable', process.platform === 'win32' ? 'python.exe' : 'python3')
+    })
+    registerTaskTools(registry, (request, context) => this.runSubagent(request, context, model, registry))
+    const mcpConfigs = this.materializeMcpConfigs(this.settings.getJson<McpServerConfig[]>('mcpServers', []))
+    await this.mcp.synchronize(mcpConfigs)
+    this.mcp.registerTools(registry)
+    const skills = new SkillManager({ workspacePath: session.workspacePath })
+    await skills.scan()
+    skills.registerTools(registry)
+    const permissions = new PermissionService(await this.loadPermissionRules())
+    permissions.setMode(session.mode)
+    permissions.setRules(listWhitelist())
+    const memoryContext = await memory.loadContext()
+    const assembled = await new PromptAssembler({
+      workspacePath: session.workspacePath,
+      os: `${process.platform} ${process.arch}`,
+      shell: this.resolveShell().executable,
+      model: model.id,
+      thinkingLevel,
+      mode: session.mode,
+      tools: registry.listForMode(session.mode),
+      projectRules: memoryContext.projectRules,
+      memorySection: formatMemorySection(memoryContext.userMemory, memoryContext.workspaceMemory),
+      skillsIndex: skills.index()
+    }).assemble()
+    const hooks = new HookRunner()
+    hooks.setHooks(this.settings.getJson<HookDefinition[]>('hooks', []))
+    return {
+      model,
+      registry,
+      memory,
+      skills,
+      permissions,
+      hooks,
+      systemPrompt: assembled.systemPrompt,
+      skillsIndex: assembled.skillsIndex
+    }
+  }
+
+  private getPrefixTracker(sessionId: string): PrefixFingerprintTracker {
+    const current = this.prefixTrackers.get(sessionId)
+    if (current) return current
+    const tracker = new PrefixFingerprintTracker()
+    this.prefixTrackers.set(sessionId, tracker)
+    return tracker
+  }
+
+  private async loadPermissionRules(): Promise<typeof BUILTIN_DANGEROUS_RULES> {
+    const custom = await loadDangerousRules([
+      join(app.getAppPath(), 'resources', 'dangerous-rules.yaml'),
+      join(app.getPath('userData'), 'dangerous-rules.yaml')
+    ])
+    // 用户规则只增补；不得用同名 warn 规则削弱内置 block 规则。
+    return [...BUILTIN_DANGEROUS_RULES, ...custom]
+  }
+
+  private async runSubagent(
+    request: SubagentRequest,
+    parentContext: ToolContext,
+    model: ModelConfig,
+    parentRegistry: ToolRegistry
+  ): Promise<SubagentResult> {
+    const id = nanoid('subagent')
+    const requested = request.allowedTools ? new Set(request.allowedTools) : null
+    const registry = parentRegistry.fork((definition) => {
+      if (definition.fullName === 'Task') return false
+      if (requested && !requested.has(definition.fullName)) return false
+      return request.type === 'explore' ? definition.readOnly === true : true
+    })
+    if (requested) {
+      const missing = [...requested].filter((name) => !registry.has(name))
+      if (missing.length) throw new Error(`子代理工具不可用或不符合类型约束: ${missing.join(', ')}`)
+    }
+    const permissions = new PermissionService(await this.loadPermissionRules())
+    permissions.setMode(request.type === 'explore' ? 'plan' : parentContext.mode as PermissionMode)
+    permissions.setRules(listWhitelist())
+    const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
+    if (!apiKey && model.apiKeyRequired !== false) throw new Error(`模型 ${model.id} 尚未配置 API Key`)
+    const systemPrompt = await assemblePromptTemplate('subagent.md', {
+      type: request.type,
+      workspacePath: parentContext.workspacePath
+    })
+    let latest = ''
+    const loop = new AgentLoop({
+      sessionId: id,
+      workspacePath: parentContext.workspacePath,
+      model,
+      apiKey,
+      thinkingLevel: 'high',
+      systemPrompt,
+      skillsIndex: '子代理使用主会话冻结后的工具白名单。',
+      registry,
+      permissions,
+      provider: this.provider,
+      maxToolRounds: 8,
+      isSubagent: true,
+      onEvent: (event) => {
+        if (event.type === 'assistantMessage' && event.text.trim()) latest = event.text.trim()
+        if (event.type === 'usage') {
+          recordUsage({
+            id: event.id,
+            sessionId: parentContext.sessionId,
+            model: event.model,
+            promptTokens: event.promptTokens,
+            cachedTokens: event.cachedTokens,
+            outputTokens: event.outputTokens,
+            hitRate: event.hitRate,
+            missCategory: event.missCategory,
+            isSubagent: true
+          })
+        }
+      },
+      confirm: (confirmation) => this.requestPermission(parentContext.sessionId, confirmation)
+    })
+    const abort = (): void => loop.cancel()
+    parentContext.signal?.addEventListener('abort', abort, { once: true })
+    try {
+      await loop.run(request.prompt)
+    } finally {
+      parentContext.signal?.removeEventListener('abort', abort)
+    }
+    writeAudit('subagent-completed', JSON.stringify({ id, type: request.type, tools: registry.listAll().map((tool) => tool.fullName) }), parentContext.sessionId)
+    return { id, type: request.type, summary: latest || '子代理已完成，但没有返回文本摘要。' }
   }
 
   private getMemoryStore(workspacePath: string): MemoryStore {
@@ -513,9 +745,20 @@ export class AgentManager {
       impact: request.impact,
       mode: request.mode
     }
+    const waiting = [...this.pendingPermissions.values()].some((item) => item.sessionId === sessionId)
+    return new Promise((resolve) => {
+      this.pendingPermissions.set(requestId, { sessionId, resolve, request: dto })
+      this.push({ type: 'agent/status', sessionId, status: 'waiting-confirmation' })
+      if (!waiting) this.push({ type: 'permission/request', sessionId, request: dto })
+    })
+  }
+
+  private requestCompaction(sessionId: string, request: CompactionConfirmationRequest): Promise<boolean> {
+    const requestId = nanoid('compact')
+    const dto: CompactionPromptDto = { ...request, requestId, sessionId }
     this.push({ type: 'agent/status', sessionId, status: 'waiting-confirmation' })
-    this.push({ type: 'permission/request', sessionId, request: dto })
-    return new Promise((resolve) => this.pendingPermissions.set(requestId, { sessionId, resolve }))
+    this.push({ type: 'compaction/request', sessionId, request: dto })
+    return new Promise((resolve) => this.pendingCompactions.set(requestId, { sessionId, resolve }))
   }
 
   private recordEvent(event: SessionEvent): void {

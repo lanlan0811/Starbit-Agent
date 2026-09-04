@@ -20,6 +20,8 @@ export function MessageRenderer({ event }: { event: SessionEvent }): JSX.Element
       return <CompactionBanner event={event} />
     case 'error':
       return <ErrorMessage event={event} />
+    case 'usage':
+      return <div className="message-usage">输入 {event.promptTokens.toLocaleString()} · 命中 {event.cachedTokens.toLocaleString()} · 未命中 {Math.max(0, event.promptTokens - event.cachedTokens).toLocaleString()} · 输出 {event.outputTokens.toLocaleString()} · {(event.hitRate * 100).toFixed(1)}%</div>
     default:
       return null
   }

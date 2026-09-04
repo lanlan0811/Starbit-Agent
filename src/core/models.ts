@@ -41,6 +41,8 @@ export interface ModelConfig {
   custom: boolean
   /** API 形态 */
   apiShape: ApiShape
+  /** 本地兼容端点可关闭鉴权；内置模型默认要求密钥。 */
+  apiKeyRequired?: boolean
   /** 模态能力 */
   modalities: Modality[]
   /** 上下文窗口大小（tokens） */

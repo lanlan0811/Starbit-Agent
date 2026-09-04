@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process'
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import { z } from 'zod'
@@ -6,6 +5,7 @@ import { ToolRegistry } from '@core/tools/registry'
 import type { ToolContext, ToolDefinition, ToolResult } from '@core/tools/types'
 import { limitToolOutput } from './output'
 import { resolveAuthorizedPath } from './workspace'
+import { runBoundedProcess } from './process'
 
 type InputRecord = Record<string, unknown>
 
@@ -229,33 +229,9 @@ function numberValue(value: unknown, fallback: number): number {
 
 async function runShell(command: string, timeoutMs: number, ctx: ToolContext, options: BuiltinToolOptions): Promise<ToolResult> {
   await stat(ctx.workspacePath)
-  return new Promise<ToolResult>((resolve, reject) => {
-    const child = spawn(options.shell.executable, [...options.shell.args, command], {
-      cwd: ctx.workspacePath,
-      env: { ...process.env, ...ctx.env },
-      windowsHide: true
-    })
-    const chunks: Buffer[] = []
-    const errors: Buffer[] = []
-    child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk))
-    child.stderr.on('data', (chunk: Buffer) => errors.push(chunk))
-    const timer = setTimeout(() => {
-      child.kill()
-      reject(new Error(`命令执行超时（${timeoutMs}ms）`))
-    }, timeoutMs)
-    const abort = (): void => {
-      child.kill()
-    }
-    ctx.signal?.addEventListener('abort', abort, { once: true })
-    child.on('error', reject)
-    child.on('close', async (code) => {
-      clearTimeout(timer)
-      ctx.signal?.removeEventListener('abort', abort)
-      const stdout = Buffer.concat(chunks).toString('utf8')
-      const stderr = Buffer.concat(errors).toString('utf8')
-      const content = [stdout, stderr].filter(Boolean).join('\n')
-      if (code !== 0) return reject(new Error(`命令退出码 ${code}\n${content}`))
-      resolve(await limitToolOutput(content || '命令执行成功，无输出。', ctx.workspacePath, ctx.toolCallId, options.maxOutputBytes))
-    })
+  const content = await runBoundedProcess({
+    executable: options.shell.executable, args: [...options.shell.args, command],
+    cwd: ctx.workspacePath, env: { ...process.env, ...ctx.env }, timeoutMs, signal: ctx.signal
   })
+  return limitToolOutput(content || '命令执行成功，无输出。', ctx.workspacePath, ctx.toolCallId, options.maxOutputBytes)
 }

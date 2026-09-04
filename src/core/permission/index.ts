@@ -68,7 +68,7 @@ export class PermissionService {
   }
 
   /** 计划文档判定（§PlanDocPattern）—— 命中 `***.md` 约定放行 */
-  isPlanDoc(path: string, pattern: RegExp = /[\\/][^\\/]*?(计划|plan)[^\\/]*\.md$/i): boolean {
+  isPlanDoc(path: string, pattern: RegExp = /(?:^|[\\/])[^\\/]*?(计划|plan)[^\\/]*\.md$/i): boolean {
     return pattern.test(path)
   }
 
@@ -79,9 +79,9 @@ export class PermissionService {
   decide(req: PermissionRequest): Decision {
     const subject = toRuleSubject(req.semanticLabel, req.subject)
 
-    if (this.isSessionApproved(req.semanticLabel, req.subject)) {
-      return { verdict: 'allow', reason: 'whitelist' }
-    }
+    // 模式中的硬拒绝不能被历史批准或永久白名单重新放行。
+    const modeDecision = this.decideByMode(req)
+    if (modeDecision.verdict === 'deny') return modeDecision
 
     // 1. 危险命令判定（优先且不可被规则覆盖的 block）
     if (req.rawCommand || req.tool.kind === 'shell' || req.tool.semanticLabel === 'Bash') {
@@ -102,11 +102,15 @@ export class PermissionService {
       this.bumpHit(rule)
       if (rule.action === 'allow') return { verdict: 'allow', reason: 'whitelist', matchedRule: rule }
       if (rule.action === 'deny') return { verdict: 'deny', reason: 'whitelist', matchedRule: rule }
-      // ask 规则落到模式判定
+      return { verdict: 'ask', reason: 'whitelist', matchedRule: rule }
+    }
+
+    if (this.isSessionApproved(req.semanticLabel, req.subject)) {
+      return { verdict: 'allow', reason: 'whitelist' }
     }
 
     // 3. 模式矩阵判定
-    return this.decideByMode(req)
+    return modeDecision
   }
 
   private decideByMode(req: PermissionRequest): Decision {
@@ -117,6 +121,7 @@ export class PermissionService {
 
     // 计划文档：计划模式下放行创建与编辑
     if (mode === 'plan') {
+      if (tool.kind === 'plan') return { verdict: 'allow', reason: 'mode' }
       if (req.createsDirectory || req.semanticLabel === 'Mkdir') {
         return { verdict: 'allow', reason: 'mode' }
       }
@@ -168,7 +173,7 @@ export class PermissionService {
 
   private findMatchingRule(subject: string): PermissionRule | undefined {
     // 永久规则优先，其次按添加顺序
-    for (const rule of this.rules) {
+    for (const rule of [...this.rules].sort((a, b) => rulePriority(a.action) - rulePriority(b.action))) {
       if (ruleMatchesBySubject(rule, subject)) return rule
     }
     return undefined
@@ -182,6 +187,10 @@ export class PermissionService {
   serialize(): { rules: PermissionRule[]; dangerousRules: DangerousRule[] } {
     return { rules: this.rules, dangerousRules: this.dangerousRules }
   }
+}
+
+function rulePriority(action: RuleAction): number {
+  return action === 'deny' ? 0 : action === 'ask' ? 1 : 2
 }
 
 function ruleMatchesBySubject(rule: PermissionRule, subject: string): boolean {

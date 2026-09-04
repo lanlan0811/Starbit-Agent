@@ -30,10 +30,15 @@ export function StatusBar(): JSX.Element {
   const currentModel = useAppStore((s) => s.currentModel)
   const workspacePath = useAppStore((s) => s.workspacePath)
   const agentStatus = useAppStore((s) => s.agentStatus)
+  const contextStatus = useAppStore((s) => s.contextStatus)
+  const cacheDiagnostic = useAppStore((s) => s.cacheDiagnostic)
 
   const statusText = agentStatus === 'running' ? '运行中' : agentStatus === 'waiting-confirmation' ? '等待确认' : '空闲'
   const modeColor =
     mode === 'plan' ? 'var(--color-primary)' : mode === 'acceptEdits' ? 'var(--color-success)' : 'var(--color-warning)'
+  const contextPercentage = Math.round((contextStatus?.ratio ?? 0) * 100)
+  const cachePercentage = cacheDiagnostic ? cacheDiagnostic.hitRate * 100 : null
+  const cacheState = cachePercentage === null ? 'neutral' : cachePercentage >= 95 ? 'green' : 'yellow'
 
   return (
     <footer className={`statusbar ${agentStatus === 'waiting-confirmation' ? 'statusbar--waiting' : ''}`}>
@@ -57,15 +62,15 @@ export function StatusBar(): JSX.Element {
       <div className="statusbar__right">
         <div className="statusbar__ctx">
           <div className="statusbar__ctx-bar">
-            <div className="statusbar__ctx-fill" style={{ width: '12%' }} />
+            <div className="statusbar__ctx-fill" style={{ width: `${contextPercentage}%` }} />
           </div>
-          <span className="statusbar__ctx-text">12%</span>
+          <span className="statusbar__ctx-text">{contextPercentage}%</span>
         </div>
 
-        <label className="statusbar__cache" title="缓存命中率（点击查看前缀诊断）">
-          <span className="statusbar__dot statusbar__dot--green" />
-          命中率 98.3%
-        </label>
+        <button className="statusbar__cache" title={cacheDiagnostic ? `miss 分类：${cacheDiagnostic.missCategory ?? '无'}；前缀变化：${cacheDiagnostic.changedSections.join(', ') || '无'}` : '尚无缓存用量数据'} onClick={() => useAppStore.getState().setActiveSection('usage')}>
+          <span className={`statusbar__dot statusbar__dot--${cacheState}`} />
+          命中率 {cachePercentage === null ? '—' : `${cachePercentage.toFixed(1)}%`}
+        </button>
 
         <label className="statusbar__workspace" title="工作区路径">
           {workspacePath || '未打开工作区'}

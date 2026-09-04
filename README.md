@@ -2,7 +2,7 @@
 
 衔星是一款 Windows 优先的桌面端通用 AI Agent 工作台。项目采用 Electron、React 与 TypeScript，自研 Agent Loop，并通过 OpenAI 兼容协议接入模型。
 
-> 当前状态：早期开发版本（0.1.0）。会话事件存储、权限核心、基础聊天界面、内置模型目录和 Provider 核心已落地；Agent Loop、模型设置界面及完整工具执行链路仍在开发中。
+> 当前状态：开发版本（0.1.0）。已接通 Agent 工具循环、自定义模型、终端、浏览器、知识库和记忆；上下文压缩与协作工具正在进行完整验收。发布、缓存目标和厂商多模态兼容仍有未完成项，详见[验收状态](docs/zh-CN/acceptance-status.md)。
 
 ## 已实现
 
@@ -15,6 +15,9 @@
 - 图片与视频内容单元转换、本地媒体 data URL 编码
 - usage 缓存字段归一化、稳定前缀规范化与 SHA-256 自检
 - Vitest 单元测试和 Playwright Electron 启动测试
+- 自定义模型端点、上下文/输出上限和三档思考参数配置
+- MCP、Claude Skills、交互终端、可视浏览器、知识库与双层记忆
+- 可取消的上下文压缩、Task 子代理、TodoWrite 计划同步、Node/Python 脚本执行
 
 ## 开发环境
 

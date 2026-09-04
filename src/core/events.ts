@@ -4,6 +4,7 @@
  */
 
 import type { JsonValue, SessionId, ToolCallId } from './types'
+import type { ContextMessage } from './context'
 
 /** 权限模式 */
 export type PermissionMode = 'plan' | 'acceptEdits' | 'fullAccess'
@@ -103,6 +104,11 @@ export interface CompactionEvent extends BaseEvent {
   type: 'compaction'
   summary: string
   preservedRange: [number, number]
+  level?: 'micro' | 'full'
+  reason?: 'automatic' | 'manual'
+  estimatedTokens?: number
+  /** 压缩后除稳定 system 之外的准确消息快照。 */
+  contextSnapshot?: ContextMessage[]
 }
 
 /** 用量事件（缓存命中率采集） */

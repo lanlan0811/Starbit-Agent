@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import type { MainToRendererEvent } from './types'
 import { SessionManager } from '../session/manager'
-import { BUILTIN_MODELS } from '@core/models'
+import type { ModelConfig } from '@core/models'
 import { AgentManager } from '../agent/manager'
 import { SettingsService } from '../security/settings'
 import { deleteWhitelist, listWhitelist } from '../session/database'
@@ -51,8 +51,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('session:replay', (_e, id: string) => sessions.replay(id))
 
   // Models
-  ipcMain.handle('models:list', () => BUILTIN_MODELS)
-  ipcMain.handle('models:configured', () => Object.fromEntries(BUILTIN_MODELS.map((model) => [model.id, agents.isModelConfigured(model.id)])))
+  ipcMain.handle('models:list', () => agents.listModels())
+  ipcMain.handle('models:save', (_e, model: ModelConfig) => agents.saveModel(model))
+  ipcMain.handle('models:delete', (_e, id: string) => agents.deleteModel(id))
+  ipcMain.handle('models:configured', () => Object.fromEntries(agents.listModels().map((model) => [model.id, agents.isModelConfigured(model.id)])))
   ipcMain.handle('models:setApiKey', (_e, modelId: string, apiKey: string) => agents.setModelApiKey(modelId, apiKey))
   ipcMain.handle('models:testConnection', (_e, modelId: string) => agents.testModel(modelId))
 
@@ -61,6 +63,7 @@ export function registerIpcHandlers(): void {
     agents.send(sessionId, content, attachments, thinkingLevel)
   )
   ipcMain.handle('agent:cancel', (_e, sessionId: string) => agents.cancel(sessionId))
+  ipcMain.handle('agent:respondCompaction', (_e, requestId: string, accepted: boolean) => agents.respondCompaction(requestId, accepted))
   ipcMain.handle('permission:respond', (_e, requestId: string, outcome: 'allow' | 'deny', scope: import('@core/permission/rules').RuleScope, reason?: string) =>
     agents.respondPermission(requestId, outcome, scope, reason)
   )

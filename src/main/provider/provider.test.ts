@@ -13,6 +13,21 @@ function model(id: string): ModelConfig {
 }
 
 describe('Provider 请求组装', () => {
+  it('Responses 工具调用与结果成对回传，Chat 保留推理内容', async () => {
+    const messages = [
+      { role: 'assistant' as const, content: '', reasoningContent: '分析', toolCalls: [{ id: 'call-1', name: 'Read', arguments: '{}' }] },
+      { role: 'tool' as const, toolCallId: 'call-1', content: '内容' }
+    ]
+    const base = { model: model('deepseek-v4-pro'), apiKey: 'key', thinkingLevel: 'max' as const, maxOutputTokens: 100, messages }
+    const chat = JSON.parse(String((await prepareProviderRequest(base)).init.body))
+    expect(chat.messages[0].reasoning_content).toBe('分析')
+    expect(chat.max_tokens).toBe(100)
+    const responses = JSON.parse(String((await prepareProviderRequest({ ...base, model: { ...base.model, apiShape: 'responses' } })).init.body))
+    expect(responses.input).toEqual([
+      { type: 'function_call', call_id: 'call-1', name: 'Read', arguments: '{}' },
+      { type: 'function_call_output', call_id: 'call-1', output: '内容' }
+    ])
+  })
   it('生成稳定的 Chat Completions 请求并过滤采样参数', async () => {
     const prepared = await prepareProviderRequest({
       model: model('deepseek-v4-pro'),
