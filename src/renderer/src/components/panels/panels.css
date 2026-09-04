@@ -29,12 +29,14 @@
 .session-item__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-primary); }
 .session-item__path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-secondary); font-size: var(--font-size-caption); }
 .settings-group { display: grid; gap: var(--space-2); padding-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
-.settings-group h3 { margin: 0; font-size: var(--font-size-body); }
+.settings-group h3 { display: flex; align-items: center; gap: var(--space-1); margin: 0; font-size: var(--font-size-body); }
 .settings-group label { color: var(--color-text-secondary); font-size: var(--font-size-caption); }
 .settings-group input,
-.settings-group select { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-input); background: var(--color-bg-surface); }
+.settings-group select,
+.settings-group textarea { width: 100%; min-width: 0; padding: 7px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-input); background: var(--color-bg-surface); color: var(--color-text-primary); font: inherit; resize: vertical; }
 .settings-group input:focus,
-.settings-group select:focus { outline: 2px solid var(--color-primary-weak); border-color: var(--color-primary); }
+.settings-group select:focus,
+.settings-group textarea:focus { outline: 2px solid var(--color-primary-weak); border-color: var(--color-primary); }
 .panel-actions { display: flex; gap: var(--space-1); flex-wrap: wrap; }
 .panel-message,
 .panel-empty { margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-caption); }
@@ -62,3 +64,31 @@
 .mcp-tool { display: flex; align-items: center; gap: var(--space-1); color: var(--color-text-secondary); font-size: var(--font-size-caption); }
 .mcp-tool { padding-left: var(--space-2); }
 .panel-button--danger { color: var(--color-danger); }
+.panel-button--icon { flex: 0 0 auto; padding-inline: var(--space-2); }
+.panel-inline { display: flex; align-items: center; gap: var(--space-1); }
+.panel-inline > input { flex: 1 1 auto; }
+.panel-checkbox { display: flex; align-items: center; gap: var(--space-2); }
+.panel-checkbox input { width: auto; }
+.document-list,
+.memory-list,
+.search-results,
+.settings-rule-list { display: grid; gap: var(--space-2); }
+.document-list article,
+.memory-list article,
+.search-results article,
+.settings-rule-list article { display: flex; align-items: start; justify-content: space-between; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-bg-surface); }
+.document-list article div,
+.settings-rule-list article div { display: grid; min-width: 0; gap: 2px; }
+.document-list article strong,
+.settings-rule-list article strong { overflow-wrap: anywhere; }
+.document-list article span,
+.settings-rule-list article span,
+.search-results article span,
+.memory-list header { color: var(--color-text-secondary); font-size: 11px; }
+.document-list article > button,
+.settings-rule-list article > button { flex: 0 0 auto; color: var(--color-danger); }
+.memory-list article,
+.search-results article { display: grid; }
+.memory-list header { display: flex; justify-content: space-between; gap: var(--space-2); }
+.memory-list p,
+.search-results p { max-height: 160px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-secondary); font-size: var(--font-size-caption); }

@@ -30,6 +30,7 @@ interface AppState {
   thinkingLevel: ThinkingLevel
   activeSection: string
   permissionPrompt: PermissionPromptState | null
+  rightPanel: 'browser' | 'terminal' | null
   setReady: (v: boolean) => void
   setAppVersion: (v: string) => void
   setWorkspacePath: (p: string) => void
@@ -44,6 +45,7 @@ interface AppState {
   setThinkingLevel: (level: ThinkingLevel) => void
   setActiveSection: (section: string) => void
   setPermissionPrompt: (request: PermissionPromptState | null) => void
+  setRightPanel: (panel: AppState['rightPanel']) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -60,6 +62,7 @@ export const useAppStore = create<AppState>((set) => ({
   thinkingLevel: 'max',
   activeSection: 'sessions',
   permissionPrompt: null,
+  rightPanel: null,
   setReady: (v) => set({ ready: v }),
   setAppVersion: (v) => set({ appVersion: v }),
   setWorkspacePath: (p) => set({ workspacePath: p }),
@@ -74,5 +77,6 @@ export const useAppStore = create<AppState>((set) => ({
   setAgentStatus: (s) => set({ agentStatus: s }),
   setThinkingLevel: (level) => set({ thinkingLevel: level }),
   setActiveSection: (section) => set({ activeSection: section }),
-  setPermissionPrompt: (request) => set({ permissionPrompt: request })
+  setPermissionPrompt: (request) => set({ permissionPrompt: request }),
+  setRightPanel: (panel) => set({ rightPanel: panel })
 }))

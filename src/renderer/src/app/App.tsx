@@ -6,6 +6,7 @@ import { StatusBar } from '../components/statusbar/StatusBar'
 import { BrandMark } from '../components/icons/BrandMark'
 import { SecondaryPanel } from '../components/panels/SecondaryPanel'
 import { PermissionDialog } from '../components/permission/PermissionDialog'
+import { RightPanel } from '../components/right-panel/RightPanel'
 import './app.css'
 
 export default function App(): JSX.Element {
@@ -56,6 +57,7 @@ export default function App(): JSX.Element {
       <Sidebar />
       <SecondaryPanel />
       <ChatArea />
+      <RightPanel />
       <StatusBar />
       <BrandMark className="starbit-shell__badge" />
       <PermissionDialog />

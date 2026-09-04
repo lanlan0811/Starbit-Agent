@@ -8,6 +8,9 @@ files:
   - resources/**
   - docs/prompts/**
 asar: true
+asarUnpack:
+  - node_modules/**/node-pty/**
+  - node_modules/**/@lydell/node-pty*/**
 win:
   target:
     - target: nsis
@@ -23,4 +26,4 @@ nsis:
 publish:
   provider: generic
   url: https://example.com/auto-updates
-npmRebuild: true
+npmRebuild: false

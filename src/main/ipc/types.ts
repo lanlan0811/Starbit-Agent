@@ -6,6 +6,10 @@ import type { ContentPart } from '@core/events'
 import type { ThinkingLevel } from '@core/models'
 import type { RuleScope, PermissionRule } from '@core/permission/rules'
 import type { PermissionPromptDto } from '../agent/manager'
+import type { BrowserBounds, BrowserControlMode, BrowserDownloadState, BrowserState, BrowserTabState } from '../browser/types'
+import type { KnowledgeBaseRecord, KnowledgeDocumentRecord, KnowledgeSearchHit } from '../knowledge/types'
+import type { KnowledgeSettings } from '../agent/manager'
+import type { MemoryEntry, MemoryScope, MemorySearchHit } from '../memory/types'
 
 /**
  * IPC API 契约 —— 主进程暴露给渲染进程的能力。
@@ -61,6 +65,48 @@ export interface IpcApi {
     list(): Promise<McpServerStateDto[]>
     set(configs: McpServerConfigDto[]): Promise<McpServerStateDto[]>
   }
+  terminal: {
+    create(sessionId: string, cols?: number, rows?: number): Promise<void>
+    write(sessionId: string, data: string): Promise<void>
+    resize(sessionId: string, cols: number, rows: number): Promise<void>
+    close(sessionId: string): Promise<void>
+  }
+  browser: {
+    getState(sessionId: string): Promise<BrowserState>
+    createTab(sessionId: string, url?: string): Promise<BrowserTabState>
+    closeTab(sessionId: string, tabId: string): Promise<BrowserState>
+    activateTab(sessionId: string, tabId: string): Promise<BrowserState>
+    navigate(sessionId: string, url: string, tabId?: string, newTab?: boolean): Promise<BrowserTabState>
+    back(sessionId: string, tabId?: string): Promise<BrowserState>
+    forward(sessionId: string, tabId?: string): Promise<BrowserState>
+    reload(sessionId: string, tabId?: string): Promise<BrowserState>
+    stop(sessionId: string, tabId?: string): Promise<BrowserState>
+    setBounds(sessionId: string, bounds: BrowserBounds): Promise<BrowserState>
+    hide(sessionId: string): Promise<void>
+    setReuseLogin(sessionId: string, enabled: boolean): Promise<BrowserState>
+    setAllowPrivateNetwork(sessionId: string, enabled: boolean): Promise<BrowserState>
+    setControlMode(sessionId: string, mode: BrowserControlMode): Promise<BrowserState>
+  }
+  knowledge: {
+    listBases(sessionId: string): Promise<KnowledgeBaseRecord[]>
+    createBase(sessionId: string, name: string, description?: string): Promise<KnowledgeBaseRecord>
+    deleteBase(sessionId: string, id: string): Promise<boolean>
+    listDocuments(sessionId: string, knowledgeBaseId?: string): Promise<KnowledgeDocumentRecord[]>
+    selectAndImport(sessionId: string, knowledgeBaseId: string): Promise<KnowledgeDocumentRecord[]>
+    importUrl(sessionId: string, knowledgeBaseId: string, url: string): Promise<KnowledgeDocumentRecord>
+    deleteDocument(sessionId: string, id: string): Promise<boolean>
+    rebuild(sessionId: string, knowledgeBaseId: string): Promise<KnowledgeDocumentRecord[]>
+    search(sessionId: string, query: string, knowledgeBaseId?: string): Promise<KnowledgeSearchHit[]>
+    getSettings(): Promise<KnowledgeSettings>
+    setSettings(settings: Partial<Omit<KnowledgeSettings, 'apiKeyConfigured'>>, apiKey?: string): Promise<KnowledgeSettings>
+  }
+  memory: {
+    list(sessionId: string, scope?: MemoryScope): Promise<MemoryEntry[]>
+    add(sessionId: string, scope: MemoryScope, content: string): Promise<MemoryEntry>
+    update(sessionId: string, id: string, content: string): Promise<MemoryEntry>
+    delete(sessionId: string, id: string): Promise<boolean>
+    search(sessionId: string, query: string, scope?: MemoryScope): Promise<MemorySearchHit[]>
+  }
   workspace: {
     selectFolder(): Promise<{ path: string } | null>
   }
@@ -111,3 +157,11 @@ export type MainToRendererEvent =
   | { type: 'session/created'; session: SessionMeta }
   | { type: 'agent/status'; sessionId: string; status: 'idle' | 'running' | 'waiting-confirmation' }
   | { type: 'permission/request'; sessionId: string; request: PermissionPromptDto }
+  | { type: 'terminal/data'; terminalId: string; data: string }
+  | { type: 'terminal/ready'; terminalId: string; pid: number }
+  | { type: 'terminal/exit'; terminalId: string; exitCode: number; signal?: number }
+  | { type: 'terminal/error'; terminalId: string; message: string }
+  | { type: 'browser/state'; state: BrowserState }
+  | { type: 'browser/show'; sessionId: string }
+  | { type: 'browser/download'; download: BrowserDownloadState }
+  | { type: 'browser/error'; sessionId: string; message: string }

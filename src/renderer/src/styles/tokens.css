@@ -13,6 +13,9 @@
   --color-danger: #dc2626;
   --color-thinking: #8b5cf6;
   --color-cache-hit: #0e9f8a;
+  --color-terminal-bg: #1f2329;
+  --color-terminal-fg: #f7f8fa;
+  --color-terminal-selection: rgba(59, 111, 240, 0.4);
 
   /* bg */
   --color-bg-app: #f7f8fa;

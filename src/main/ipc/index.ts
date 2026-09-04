@@ -5,10 +5,24 @@ import { BUILTIN_MODELS } from '@core/models'
 import { AgentManager } from '../agent/manager'
 import { SettingsService } from '../security/settings'
 import { deleteWhitelist, listWhitelist } from '../session/database'
+import { PtyHost } from '../pty/host'
+import { BrowserManager } from '../browser/manager'
+import type { BrowserBounds, BrowserControlMode } from '../browser/types'
 
 const sessions = new SessionManager()
 const settings = new SettingsService()
-const agents = new AgentManager(sessions, settings, pushToRenderer)
+const browser = new BrowserManager({
+  getHostWindow: () => BrowserWindow.getAllWindows().find((window) => !window.isDestroyed()) ?? null,
+  settings,
+  emit: pushToRenderer
+})
+const agents = new AgentManager(sessions, settings, pushToRenderer, browser)
+const pty = new PtyHost((event) => {
+  if (event.type === 'data') pushToRenderer({ type: 'terminal/data', terminalId: event.terminalId, data: event.data })
+  else if (event.type === 'ready') pushToRenderer({ type: 'terminal/ready', terminalId: event.terminalId, pid: event.pid })
+  else if (event.type === 'exit') pushToRenderer({ type: 'terminal/exit', terminalId: event.terminalId, exitCode: event.exitCode, signal: event.signal })
+  else if (event.type === 'error') pushToRenderer({ type: 'terminal/error', terminalId: event.terminalId, message: event.message })
+})
 
 /** 主进程推送到渲染进程 */
 export function pushToRenderer(event: MainToRendererEvent): void {
@@ -61,7 +75,103 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('skills:list', (_e, workspacePath: string) => agents.listSkills(workspacePath))
   ipcMain.handle('mcp:list', () => agents.listMcpServers())
   ipcMain.handle('mcp:set', (_e, configs: import('../mcp/types').McpServerConfig[]) => agents.setMcpServers(configs))
-  ipcMain.handle('app:shutdownServices', () => agents.shutdown())
+
+  // Terminal
+  ipcMain.handle('terminal:create', (_e, sessionId: string, cols?: number, rows?: number) => {
+    const session = sessions.get(sessionId)
+    if (!session) throw new Error(`会话不存在: ${sessionId}`)
+    const shell = agents.getTerminalShell()
+    pty.create({ terminalId: sessionId, executable: shell.executable, args: shell.args, cwd: session.workspacePath, cols, rows })
+  })
+  ipcMain.handle('terminal:write', (_e, sessionId: string, data: string) => pty.write(sessionId, data))
+  ipcMain.handle('terminal:resize', (_e, sessionId: string, cols: number, rows: number) => pty.resize(sessionId, cols, rows))
+  ipcMain.handle('terminal:close', (_e, sessionId: string) => pty.closeTerminal(sessionId))
+
+  // Browser
+  ipcMain.handle('browser:getState', (_e, sessionId: string) => {
+    const session = requireSession(sessionId)
+    return browser.getState(sessionId, session.workspacePath)
+  })
+  ipcMain.handle('browser:createTab', (_e, sessionId: string, url?: string) => {
+    const session = requireSession(sessionId)
+    return browser.createTab(sessionId, session.workspacePath, url)
+  })
+  ipcMain.handle('browser:closeTab', (_e, sessionId: string, tabId: string) => {
+    const session = requireSession(sessionId)
+    return browser.closeTab(sessionId, session.workspacePath, tabId)
+  })
+  ipcMain.handle('browser:activateTab', (_e, sessionId: string, tabId: string) => {
+    const session = requireSession(sessionId)
+    return browser.activateTab(sessionId, session.workspacePath, tabId)
+  })
+  ipcMain.handle('browser:navigate', (_e, sessionId: string, url: string, tabId?: string, newTab?: boolean) => {
+    const session = requireSession(sessionId)
+    return browser.navigate({ sessionId, workspacePath: session.workspacePath, url, tabId, newTab, actor: 'user' })
+  })
+  ipcMain.handle('browser:back', (_e, sessionId: string, tabId?: string) => {
+    const session = requireSession(sessionId)
+    return browser.goBack(sessionId, session.workspacePath, tabId)
+  })
+  ipcMain.handle('browser:forward', (_e, sessionId: string, tabId?: string) => {
+    const session = requireSession(sessionId)
+    return browser.goForward(sessionId, session.workspacePath, tabId)
+  })
+  ipcMain.handle('browser:reload', (_e, sessionId: string, tabId?: string) => {
+    const session = requireSession(sessionId)
+    return browser.reload(sessionId, session.workspacePath, tabId)
+  })
+  ipcMain.handle('browser:stop', (_e, sessionId: string, tabId?: string) => {
+    const session = requireSession(sessionId)
+    return browser.stop(sessionId, session.workspacePath, tabId)
+  })
+  ipcMain.handle('browser:setBounds', (_e, sessionId: string, bounds: BrowserBounds) => {
+    const session = requireSession(sessionId)
+    return browser.setBounds(sessionId, session.workspacePath, bounds)
+  })
+  ipcMain.handle('browser:hide', (_e, sessionId: string) => browser.hide(sessionId))
+  ipcMain.handle('browser:setReuseLogin', (_e, sessionId: string, enabled: boolean) => {
+    const session = requireSession(sessionId)
+    return browser.setReuseLogin(sessionId, session.workspacePath, enabled)
+  })
+  ipcMain.handle('browser:setAllowPrivateNetwork', (_e, sessionId: string, enabled: boolean) => {
+    const session = requireSession(sessionId)
+    return browser.setAllowPrivateNetwork(sessionId, session.workspacePath, enabled)
+  })
+  ipcMain.handle('browser:setControlMode', (_e, sessionId: string, mode: BrowserControlMode) => {
+    const session = requireSession(sessionId)
+    return browser.setControlMode(sessionId, session.workspacePath, mode)
+  })
+
+  // Knowledge base
+  ipcMain.handle('knowledge:listBases', (_e, sessionId: string) => agents.listKnowledgeBases(sessionId))
+  ipcMain.handle('knowledge:createBase', (_e, sessionId: string, name: string, description?: string) => agents.createKnowledgeBase(sessionId, name, description))
+  ipcMain.handle('knowledge:deleteBase', (_e, sessionId: string, id: string) => agents.deleteKnowledgeBase(sessionId, id))
+  ipcMain.handle('knowledge:listDocuments', (_e, sessionId: string, knowledgeBaseId?: string) => agents.listKnowledgeDocuments(sessionId, knowledgeBaseId))
+  ipcMain.handle('knowledge:selectAndImport', async (_e, sessionId: string, knowledgeBaseId: string) => {
+    requireSession(sessionId)
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: '支持的文档', extensions: ['md', 'markdown', 'txt', 'html', 'htm', 'pdf', 'docx'] }]
+    })
+    if (result.canceled) return []
+    const imported = []
+    for (const path of result.filePaths) imported.push(await agents.importKnowledgeDocument(sessionId, knowledgeBaseId, path))
+    return imported
+  })
+  ipcMain.handle('knowledge:importUrl', (_e, sessionId: string, knowledgeBaseId: string, url: string) => agents.importKnowledgeUrl(sessionId, knowledgeBaseId, url))
+  ipcMain.handle('knowledge:deleteDocument', (_e, sessionId: string, id: string) => agents.deleteKnowledgeDocument(sessionId, id))
+  ipcMain.handle('knowledge:rebuild', (_e, sessionId: string, id: string) => agents.rebuildKnowledgeBase(sessionId, id))
+  ipcMain.handle('knowledge:search', (_e, sessionId: string, query: string, knowledgeBaseId?: string) => agents.searchKnowledge(sessionId, query, knowledgeBaseId))
+  ipcMain.handle('knowledge:getSettings', () => agents.getKnowledgeSettings())
+  ipcMain.handle('knowledge:setSettings', (_e, value: Parameters<AgentManager['setKnowledgeSettings']>[0], apiKey?: string) => agents.setKnowledgeSettings(value, apiKey))
+
+  // Memory
+  ipcMain.handle('memory:list', (_e, sessionId: string, scope?: import('../memory/types').MemoryScope) => agents.listMemory(sessionId, scope))
+  ipcMain.handle('memory:add', (_e, sessionId: string, scope: import('../memory/types').MemoryScope, content: string) => agents.addMemory(sessionId, scope, content))
+  ipcMain.handle('memory:update', (_e, sessionId: string, id: string, content: string) => agents.updateMemory(sessionId, id, content))
+  ipcMain.handle('memory:delete', (_e, sessionId: string, id: string) => agents.deleteMemory(sessionId, id))
+  ipcMain.handle('memory:search', (_e, sessionId: string, query: string, scope?: import('../memory/types').MemoryScope) => agents.searchMemory(sessionId, query, scope))
 
   // Workspace
   ipcMain.handle('workspace:selectFolder', async () => {
@@ -72,4 +182,16 @@ export function registerIpcHandlers(): void {
     if (result.canceled || result.filePaths.length === 0) return null
     return { path: result.filePaths[0] }
   })
+}
+
+export async function shutdownIpcServices(): Promise<void> {
+  pty.close()
+  browser.close()
+  await agents.shutdown()
+}
+
+function requireSession(sessionId: string): NonNullable<ReturnType<SessionManager['get']>> {
+  const session = sessions.get(sessionId)
+  if (!session) throw new Error(`会话不存在: ${sessionId}`)
+  return session
 }

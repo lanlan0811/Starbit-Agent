@@ -184,7 +184,7 @@ export class AgentLoop {
         continue
       }
       const input = asRecord(call.input)
-      const subject = typeof input.command === 'string' ? input.command : typeof input.path === 'string' ? input.path : call.name
+      const subject = permissionSubject(call.name, input)
       const request: PermissionRequest = {
         tool,
         semanticLabel: tool.semanticLabel,
@@ -326,6 +326,15 @@ function wrapUntrusted(content: string): string {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function permissionSubject(toolName: string, input: Record<string, unknown>): string {
+  if (typeof input.command === 'string') return input.command
+  if (typeof input.path === 'string') return input.path
+  if (Array.isArray(input.paths) && input.paths.every((item) => typeof item === 'string')) return input.paths.join(', ')
+  if (typeof input.url === 'string') return input.url
+  if (typeof input.selector === 'string') return input.selector
+  return toolName
 }
 
 function errorMessage(error: unknown): string {

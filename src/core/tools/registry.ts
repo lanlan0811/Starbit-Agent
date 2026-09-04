@@ -117,13 +117,15 @@ export function isAllowedByMode(def: ToolDefinition, mode: PermissionMode): bool
     case 'plan':
       return true
     case 'shell':
-    case 'browser':
     case 'sandbox':
     case 'mcp':
     case 'skill':
     case 'memory':
     case 'kb':
       return def.readOnly === true
+    case 'browser':
+      // 自动编辑模式可向模型披露浏览器写操作，运行时由 PermissionService 统一询问。
+      return true
     default:
       return true
   }

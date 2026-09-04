@@ -43,6 +43,8 @@ const PANEL_ITEMS: NavItem[] = [
 export function Sidebar(): JSX.Element {
   const activeSection = useAppStore((state) => state.activeSection)
   const setActiveSection = useAppStore((state) => state.setActiveSection)
+  const rightPanel = useAppStore((state) => state.rightPanel)
+  const setRightPanel = useAppStore((state) => state.setRightPanel)
   return (
     <nav className="sidebar" aria-label="主导航">
       <div className="sidebar__group">
@@ -69,7 +71,13 @@ export function Sidebar(): JSX.Element {
 
       <div className="sidebar__group sidebar__group--bottom">
         {PANEL_ITEMS.map((item) => (
-          <button key={item.key} className="sidebar__item" data-tooltip={item.label} title={item.label}>
+          <button
+            key={item.key}
+            className={`sidebar__item ${rightPanel === item.key ? 'sidebar__item--active' : ''}`}
+            data-tooltip={item.label}
+            title={item.label}
+            onClick={() => setRightPanel(rightPanel === item.key ? null : item.key as 'browser' | 'terminal')}
+          >
             {item.icon}
           </button>
         ))}

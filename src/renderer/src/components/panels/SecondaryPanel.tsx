@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen, KeyRound, Plus, RefreshCw, Save } from 'lucide-react'
+import { BookOpen, Brain, FolderOpen, KeyRound, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import type { AuditDto, McpServerConfigDto, McpServerStateDto, UsageSummaryDto } from '../../../../main/ipc/types'
+import type { PermissionRule } from '@core/permission/rules'
 import { useAppStore } from '../../stores/app'
+import { KnowledgePanel } from './KnowledgePanel'
+import { MemoryPanel } from './MemoryPanel'
 import './panels.css'
 
 const TITLES: Record<string, string> = {
@@ -14,7 +17,7 @@ export function SecondaryPanel(): JSX.Element {
     <aside className="secondary-panel" aria-label={TITLES[active] ?? '功能面板'}>
       <header className="secondary-panel__header">{TITLES[active] ?? active}</header>
       <div className="secondary-panel__body">
-        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : active === 'mcp' ? <McpPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
+        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : active === 'mcp' ? <McpPanel /> : active === 'kb' ? <KnowledgePanel /> : active === 'memory' ? <MemoryPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
       </div>
     </aside>
   )
@@ -63,19 +66,43 @@ function SessionsPanel(): JSX.Element {
 function SettingsPanel(): JSX.Element {
   const models = useAppStore((state) => state.models)
   const currentModel = useAppStore((state) => state.currentModel)
+  const currentSessionId = useAppStore((state) => state.currentSessionId)
   const [apiKey, setApiKey] = useState('')
   const [configured, setConfigured] = useState<Record<string, boolean>>({})
   const [shellExecutable, setShellExecutable] = useState('')
   const [shellArgs, setShellArgs] = useState('')
+  const [rules, setRules] = useState<PermissionRule[]>([])
+  const [embeddingMode, setEmbeddingMode] = useState<'local' | 'auto' | 'remote'>('local')
+  const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState('')
+  const [embeddingModel, setEmbeddingModel] = useState('')
+  const [embeddingDimensions, setEmbeddingDimensions] = useState(384)
+  const [embeddingApiKey, setEmbeddingApiKey] = useState('')
+  const [embeddingKeyConfigured, setEmbeddingKeyConfigured] = useState(false)
+  const [reuseLogin, setReuseLogin] = useState(false)
+  const [allowPrivateNetwork, setAllowPrivateNetwork] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    void Promise.all([window.starbit.models.configured(), window.starbit.settings.getShell()]).then(([keys, shell]) => {
+    void Promise.all([
+      window.starbit.models.configured(),
+      window.starbit.settings.getShell(),
+      window.starbit.permission.listRules(),
+      window.starbit.knowledge.getSettings(),
+      currentSessionId ? window.starbit.browser.getState(currentSessionId) : Promise.resolve(null)
+    ]).then(([keys, shell, nextRules, embedding, browserState]) => {
       setConfigured(keys)
       setShellExecutable(shell.executable)
       setShellArgs(shell.args.join(' '))
+      setRules(nextRules)
+      setEmbeddingMode(embedding.mode)
+      setEmbeddingBaseUrl(embedding.baseUrl)
+      setEmbeddingModel(embedding.model)
+      setEmbeddingDimensions(embedding.dimensions)
+      setEmbeddingKeyConfigured(embedding.apiKeyConfigured)
+      setReuseLogin(browserState?.reuseLogin ?? false)
+      setAllowPrivateNetwork(browserState?.allowPrivateNetwork ?? false)
     })
-  }, [])
+  }, [currentSessionId])
 
   const saveKey = async (): Promise<void> => {
     await window.starbit.models.setApiKey(currentModel, apiKey)
@@ -93,6 +120,34 @@ function SettingsPanel(): JSX.Element {
   const saveShell = async (): Promise<void> => {
     await window.starbit.settings.setShell({ executable: shellExecutable, args: splitArgs(shellArgs) })
     setMessage('Shell 配置已保存。')
+  }
+
+  const saveEmbedding = async (): Promise<void> => {
+    const result = await window.starbit.knowledge.setSettings({
+      mode: embeddingMode,
+      baseUrl: embeddingBaseUrl,
+      model: embeddingModel,
+      dimensions: embeddingDimensions
+    }, embeddingApiKey || undefined)
+    setEmbeddingKeyConfigured(result.apiKeyConfigured)
+    setEmbeddingApiKey('')
+    setMessage('知识库 Embedding 配置已保存。已有文档可在知识库面板重建索引。')
+  }
+
+  const deleteRule = async (id: string): Promise<void> => {
+    await window.starbit.permission.deleteRule(id)
+    setRules(await window.starbit.permission.listRules())
+    setMessage('权限规则已删除。')
+  }
+
+  const updateBrowserSetting = async (kind: 'reuse' | 'private', value: boolean): Promise<void> => {
+    if (!currentSessionId) return
+    const state = kind === 'reuse'
+      ? await window.starbit.browser.setReuseLogin(currentSessionId, value)
+      : await window.starbit.browser.setAllowPrivateNetwork(currentSessionId, value)
+    setReuseLogin(state.reuseLogin)
+    setAllowPrivateNetwork(state.allowPrivateNetwork)
+    setMessage('浏览器安全设置已保存到当前会话。')
   }
 
   return (
@@ -117,6 +172,45 @@ function SettingsPanel(): JSX.Element {
         <label>启动参数</label>
         <input value={shellArgs} onChange={(event) => setShellArgs(event.target.value)} />
         <button className="panel-button" onClick={() => void saveShell()}><Save size={14} /> 保存 Shell</button>
+      </section>
+      <section className="settings-group">
+        <h3><ShieldCheck size={15} /> 权限白名单</h3>
+        <div className="settings-rule-list">
+          {rules.map((rule) => <article key={rule.id}><div><strong>{rule.semanticLabel}({rule.pattern})</strong><span>{rule.action} · {rule.scope} · 命中 {rule.hitCount ?? 0} 次</span></div><button title="删除规则" onClick={() => void deleteRule(rule.id)}><Trash2 size={13} /></button></article>)}
+          {rules.length === 0 && <EmptyText>尚无持久化权限规则。</EmptyText>}
+        </div>
+      </section>
+      <section className="settings-group">
+        <h3><BookOpen size={15} /> 知识库 Embedding</h3>
+        <label>运行模式</label>
+        <select value={embeddingMode} onChange={(event) => setEmbeddingMode(event.target.value as typeof embeddingMode)}>
+          <option value="local">本地离线</option>
+          <option value="auto">远程优先，失败回退本地</option>
+          <option value="remote">仅远程</option>
+        </select>
+        {embeddingMode !== 'local' && <>
+          <label>OpenAI 兼容 Base URL</label>
+          <input value={embeddingBaseUrl} onChange={(event) => setEmbeddingBaseUrl(event.target.value)} placeholder="https://api.example.com/v1" />
+          <label>Embedding 模型</label>
+          <input value={embeddingModel} onChange={(event) => setEmbeddingModel(event.target.value)} placeholder="text-embedding-model" />
+          <label>API Key {embeddingKeyConfigured ? '（已配置）' : '（未配置）'}</label>
+          <input type="password" autoComplete="off" value={embeddingApiKey} onChange={(event) => setEmbeddingApiKey(event.target.value)} placeholder="留空则保留现有密钥" />
+        </>}
+        <label>向量维度</label>
+        <input type="number" min={16} max={8192} value={embeddingDimensions} onChange={(event) => setEmbeddingDimensions(Number(event.target.value))} />
+        <button className="panel-button" onClick={() => void saveEmbedding()}><Save size={14} /> 保存 Embedding</button>
+      </section>
+      <section className="settings-group">
+        <h3>浏览器安全</h3>
+        {currentSessionId ? <>
+          <label className="panel-checkbox"><input type="checkbox" checked={reuseLogin} onChange={(event) => void updateBrowserSetting('reuse', event.target.checked)} /> 显式复用登录态</label>
+          <label className="panel-checkbox"><input type="checkbox" checked={allowPrivateNetwork} onChange={(event) => void updateBrowserSetting('private', event.target.checked)} /> 允许访问本机与私有网络</label>
+        </> : <EmptyText>选择会话后可管理浏览器安全设置。</EmptyText>}
+      </section>
+      <section className="settings-group">
+        <h3><Brain size={15} /> 记忆</h3>
+        <p className="panel-message">用户级与工作区级 memory.md 会在每轮自动加载；AGENTS.md 始终只读。</p>
+        <button className="panel-button" onClick={() => useAppStore.getState().setActiveSection('memory')}>打开记忆管理</button>
       </section>
       {message && <p className="panel-message" role="status">{message}</p>}
     </div>

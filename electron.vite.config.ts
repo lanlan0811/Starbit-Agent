@@ -6,8 +6,13 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
-      lib: {
-        entry: 'src/main/index.ts'
+      rollupOptions: {
+        external: ['node-pty'],
+        input: {
+          index: resolve('src/main/index.ts'),
+          'pty-worker': resolve('src/main/pty/worker.ts'),
+          'pty-native-worker': resolve('src/main/pty/native-worker.ts')
+        }
       }
     },
     resolve: {

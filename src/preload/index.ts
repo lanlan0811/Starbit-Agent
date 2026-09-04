@@ -44,6 +44,48 @@ const api: IpcApi = {
     list: () => ipcRenderer.invoke('mcp:list'),
     set: (configs) => ipcRenderer.invoke('mcp:set', configs)
   },
+  terminal: {
+    create: (sessionId, cols, rows) => ipcRenderer.invoke('terminal:create', sessionId, cols, rows),
+    write: (sessionId, data) => ipcRenderer.invoke('terminal:write', sessionId, data),
+    resize: (sessionId, cols, rows) => ipcRenderer.invoke('terminal:resize', sessionId, cols, rows),
+    close: (sessionId) => ipcRenderer.invoke('terminal:close', sessionId)
+  },
+  browser: {
+    getState: (sessionId) => ipcRenderer.invoke('browser:getState', sessionId),
+    createTab: (sessionId, url) => ipcRenderer.invoke('browser:createTab', sessionId, url),
+    closeTab: (sessionId, tabId) => ipcRenderer.invoke('browser:closeTab', sessionId, tabId),
+    activateTab: (sessionId, tabId) => ipcRenderer.invoke('browser:activateTab', sessionId, tabId),
+    navigate: (sessionId, url, tabId, newTab) => ipcRenderer.invoke('browser:navigate', sessionId, url, tabId, newTab),
+    back: (sessionId, tabId) => ipcRenderer.invoke('browser:back', sessionId, tabId),
+    forward: (sessionId, tabId) => ipcRenderer.invoke('browser:forward', sessionId, tabId),
+    reload: (sessionId, tabId) => ipcRenderer.invoke('browser:reload', sessionId, tabId),
+    stop: (sessionId, tabId) => ipcRenderer.invoke('browser:stop', sessionId, tabId),
+    setBounds: (sessionId, bounds) => ipcRenderer.invoke('browser:setBounds', sessionId, bounds),
+    hide: (sessionId) => ipcRenderer.invoke('browser:hide', sessionId),
+    setReuseLogin: (sessionId, enabled) => ipcRenderer.invoke('browser:setReuseLogin', sessionId, enabled),
+    setAllowPrivateNetwork: (sessionId, enabled) => ipcRenderer.invoke('browser:setAllowPrivateNetwork', sessionId, enabled),
+    setControlMode: (sessionId, mode) => ipcRenderer.invoke('browser:setControlMode', sessionId, mode)
+  },
+  knowledge: {
+    listBases: (sessionId) => ipcRenderer.invoke('knowledge:listBases', sessionId),
+    createBase: (sessionId, name, description) => ipcRenderer.invoke('knowledge:createBase', sessionId, name, description),
+    deleteBase: (sessionId, id) => ipcRenderer.invoke('knowledge:deleteBase', sessionId, id),
+    listDocuments: (sessionId, knowledgeBaseId) => ipcRenderer.invoke('knowledge:listDocuments', sessionId, knowledgeBaseId),
+    selectAndImport: (sessionId, knowledgeBaseId) => ipcRenderer.invoke('knowledge:selectAndImport', sessionId, knowledgeBaseId),
+    importUrl: (sessionId, knowledgeBaseId, url) => ipcRenderer.invoke('knowledge:importUrl', sessionId, knowledgeBaseId, url),
+    deleteDocument: (sessionId, id) => ipcRenderer.invoke('knowledge:deleteDocument', sessionId, id),
+    rebuild: (sessionId, knowledgeBaseId) => ipcRenderer.invoke('knowledge:rebuild', sessionId, knowledgeBaseId),
+    search: (sessionId, query, knowledgeBaseId) => ipcRenderer.invoke('knowledge:search', sessionId, query, knowledgeBaseId),
+    getSettings: () => ipcRenderer.invoke('knowledge:getSettings'),
+    setSettings: (value, apiKey) => ipcRenderer.invoke('knowledge:setSettings', value, apiKey)
+  },
+  memory: {
+    list: (sessionId, scope) => ipcRenderer.invoke('memory:list', sessionId, scope),
+    add: (sessionId, scope, content) => ipcRenderer.invoke('memory:add', sessionId, scope, content),
+    update: (sessionId, id, content) => ipcRenderer.invoke('memory:update', sessionId, id, content),
+    delete: (sessionId, id) => ipcRenderer.invoke('memory:delete', sessionId, id),
+    search: (sessionId, query, scope) => ipcRenderer.invoke('memory:search', sessionId, query, scope)
+  },
   workspace: {
     selectFolder: () => ipcRenderer.invoke('workspace:selectFolder')
   }

@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ContentPart, ErrorEvent, PermissionMode, SessionEvent, UsageEvent } from '@core/events'
 import { BUILTIN_MODELS, getModel, type ModelConfig, type ThinkingLevel } from '@core/models'
@@ -18,6 +17,15 @@ import { SkillManager } from '../skills/manager'
 import { HookRunner, type HookDefinition } from '../hooks/runner'
 import { McpManager } from '../mcp/manager'
 import type { McpServerConfig, McpServerState } from '../mcp/types'
+import type { BrowserAutomation } from '../browser/types'
+import { registerBrowserTools } from '../browser/tools'
+import { KnowledgeStore } from '../knowledge/store'
+import { registerKnowledgeTools } from '../knowledge/tools'
+import type { EmbeddingConfig, EmbeddingMode } from '../knowledge/embeddings'
+import type { KnowledgeBaseRecord, KnowledgeDocumentRecord, KnowledgeSearchHit } from '../knowledge/types'
+import { MemoryStore } from '../memory/store'
+import { registerMemoryTools } from '../memory/tools'
+import type { MemoryEntry, MemoryScope, MemorySearchHit } from '../memory/types'
 
 export interface PermissionPromptDto {
   requestId: string
@@ -41,17 +49,35 @@ export type AgentEventSink =
   | { type: 'agent/status'; sessionId: string; status: 'idle' | 'running' | 'waiting-confirmation' }
   | { type: 'permission/request'; sessionId: string; request: PermissionPromptDto }
 
+export interface KnowledgeSettings {
+  mode: EmbeddingMode
+  baseUrl: string
+  model: string
+  dimensions: number
+  apiKeyConfigured: boolean
+}
+
+interface StoredKnowledgeSettings {
+  mode: EmbeddingMode
+  baseUrl: string
+  model: string
+  dimensions: number
+}
+
 /** 管理每个会话的 AgentLoop、取消和权限确认生命周期。 */
 export class AgentManager {
   private readonly active = new Map<string, AgentLoop>()
   private readonly pendingPermissions = new Map<string, PendingPermission>()
   private readonly provider = new OpenAiCompatibleProvider()
   private readonly mcp = new McpManager()
+  private readonly knowledgeStores = new Map<string, Promise<KnowledgeStore>>()
+  private readonly memoryStores = new Map<string, MemoryStore>()
 
   constructor(
     private readonly sessions: SessionManager,
     private readonly settings: SettingsService,
-    private readonly push: (event: AgentEventSink) => void
+    private readonly push: (event: AgentEventSink) => void,
+    private readonly browser?: BrowserAutomation
   ) {}
 
   async send(sessionId: string, content: string, attachments: ContentPart[] = [], thinkingLevel: ThinkingLevel = 'max'): Promise<void> {
@@ -65,6 +91,13 @@ export class AgentManager {
       const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
       if (!apiKey) throw new Error(`模型 ${model.id} 尚未配置 API Key，请在设置中完成配置。`)
       const registry = createBuiltinToolRegistry({ shell: this.resolveShell() })
+      if (this.browser) registerBrowserTools(registry, this.browser)
+      const [knowledge, memory] = await Promise.all([
+        this.getKnowledgeStore(session.workspacePath),
+        Promise.resolve(this.getMemoryStore(session.workspacePath))
+      ])
+      registerKnowledgeTools(registry, knowledge)
+      registerMemoryTools(registry, memory)
       const mcpConfigs = this.materializeMcpConfigs(this.settings.getJson<McpServerConfig[]>('mcpServers', []))
       await this.mcp.synchronize(mcpConfigs)
       this.mcp.registerTools(registry)
@@ -74,9 +107,8 @@ export class AgentManager {
       const permissions = new PermissionService(BUILTIN_DANGEROUS_RULES)
       permissions.setMode(session.mode)
       permissions.setRules(listWhitelist())
-      const [projectRules, memorySection, directSkillContext] = await Promise.all([
-        readOptional(join(session.workspacePath, 'AGENTS.md')),
-        readOptional(join(session.workspacePath, 'memory.md')),
+      const [memoryContext, directSkillContext] = await Promise.all([
+        memory.loadContext(),
         skills.directContext(content)
       ])
       const assembled = await new PromptAssembler({
@@ -87,8 +119,8 @@ export class AgentManager {
         thinkingLevel,
         mode: session.mode,
         tools: registry.listForMode(session.mode),
-        projectRules,
-        memorySection,
+        projectRules: memoryContext.projectRules,
+        memorySection: formatMemorySection(memoryContext.userMemory, memoryContext.workspaceMemory),
         skillsIndex: skills.index()
       }).assemble()
       const hooks = new HookRunner()
@@ -134,6 +166,7 @@ export class AgentManager {
         hookedPrompt.attachments,
         directSkillContext ? `<loaded-skill>\n${directSkillContext}\n</loaded-skill>` : ''
       )
+      await memory.saveSessionSummary(sessionId, summarizeSession(this.sessions.replay(sessionId)))
       await hooks.run('SessionEnd', { sessionId, workspacePath: session.workspacePath, payload: { status: 'completed' } })
     } catch (error) {
       if (!loop) this.recordEvent(this.errorEvent(sessionId, error))
@@ -185,6 +218,19 @@ export class AgentManager {
     return this.resolveShell()
   }
 
+  getTerminalShell(): ShellSettings {
+    const configured = this.settings.getJson<Partial<ShellSettings>>('terminalShell', {})
+    if (configured.executable && Array.isArray(configured.args)) return { executable: configured.executable, args: configured.args }
+    const shell = this.resolveShell()
+    const executable = shell.executable.toLowerCase()
+    const commandFlags = executable.includes('powershell') || executable.includes('pwsh')
+      ? new Set(['-command', '-noninteractive'])
+      : executable.endsWith('cmd.exe') || executable === 'cmd'
+        ? new Set(['/c'])
+        : new Set(['-c', '-lc'])
+    return { executable: shell.executable, args: shell.args.filter((arg) => !commandFlags.has(arg.toLowerCase())) }
+  }
+
   setShell(shell: ShellSettings): void {
     if (!shell.executable.trim() || !Array.isArray(shell.args)) throw new Error('Shell 配置无效')
     this.settings.setJson('shell', { executable: shell.executable.trim(), args: shell.args })
@@ -214,7 +260,120 @@ export class AgentManager {
 
   async shutdown(): Promise<void> {
     for (const sessionId of this.active.keys()) this.cancel(sessionId)
+    const stores = await Promise.allSettled(this.knowledgeStores.values())
+    await Promise.allSettled(stores.flatMap((result) => result.status === 'fulfilled' ? [result.value.close()] : []))
+    this.knowledgeStores.clear()
     await this.mcp.close()
+  }
+
+  getKnowledgeSettings(): KnowledgeSettings {
+    const stored = this.readKnowledgeSettings()
+    return { ...stored, apiKeyConfigured: this.settings.hasSecret('knowledge:embeddingApiKey') }
+  }
+
+  async setKnowledgeSettings(
+    patch: Partial<Omit<KnowledgeSettings, 'apiKeyConfigured'>>,
+    apiKey?: string
+  ): Promise<KnowledgeSettings> {
+    const current = this.readKnowledgeSettings()
+    const next: StoredKnowledgeSettings = {
+      mode: patch.mode ?? current.mode,
+      baseUrl: patch.baseUrl?.trim() ?? current.baseUrl,
+      model: patch.model?.trim() ?? current.model,
+      dimensions: patch.dimensions ?? current.dimensions
+    }
+    if (!['auto', 'remote', 'local'].includes(next.mode)) throw new Error('Embedding 模式无效')
+    if (!Number.isInteger(next.dimensions) || next.dimensions < 16 || next.dimensions > 8192) {
+      throw new Error('Embedding 维度必须是 16 到 8192 之间的整数')
+    }
+    if (next.mode === 'remote' && (!next.baseUrl || !next.model)) throw new Error('远程 Embedding 需要 Base URL 和模型名')
+    if (next.baseUrl) {
+      const url = new URL(next.baseUrl)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Embedding Base URL 必须使用 HTTP(S)')
+    }
+    this.settings.setJson('knowledge:embedding', next)
+    if (apiKey !== undefined) this.settings.setSecret('knowledge:embeddingApiKey', apiKey.trim())
+    const embedding = this.materializeEmbeddingConfig(next)
+    for (const pending of this.knowledgeStores.values()) {
+      const result = await Promise.resolve(pending).catch(() => null)
+      result?.setEmbeddingProvider(embedding)
+    }
+    writeAudit('knowledge-settings-updated', JSON.stringify(redact({ ...next, apiKeyConfigured: Boolean(apiKey?.trim()) || this.settings.hasSecret('knowledge:embeddingApiKey') })))
+    return this.getKnowledgeSettings()
+  }
+
+  async listKnowledgeBases(sessionId: string): Promise<KnowledgeBaseRecord[]> {
+    return (await this.knowledgeForSession(sessionId)).listKnowledgeBases()
+  }
+
+  async createKnowledgeBase(sessionId: string, name: string, description = ''): Promise<KnowledgeBaseRecord> {
+    const record = await (await this.knowledgeForSession(sessionId)).createKnowledgeBase(name, description)
+    writeAudit('knowledge-base-created', JSON.stringify({ id: record.id, name: record.name }), sessionId)
+    return record
+  }
+
+  async deleteKnowledgeBase(sessionId: string, id: string): Promise<boolean> {
+    const deleted = await (await this.knowledgeForSession(sessionId)).deleteKnowledgeBase(id)
+    if (deleted) writeAudit('knowledge-base-deleted', JSON.stringify({ id }), sessionId)
+    return deleted
+  }
+
+  async listKnowledgeDocuments(sessionId: string, knowledgeBaseId?: string): Promise<KnowledgeDocumentRecord[]> {
+    return (await this.knowledgeForSession(sessionId)).listDocuments(knowledgeBaseId)
+  }
+
+  async importKnowledgeDocument(sessionId: string, knowledgeBaseId: string, path: string): Promise<KnowledgeDocumentRecord> {
+    const record = await (await this.knowledgeForSession(sessionId)).importDocument({ knowledgeBaseId, path })
+    writeAudit('knowledge-document-imported', JSON.stringify({ id: record.id, source: record.source }), sessionId)
+    return record
+  }
+
+  async importKnowledgeUrl(sessionId: string, knowledgeBaseId: string, url: string): Promise<KnowledgeDocumentRecord> {
+    const record = await (await this.knowledgeForSession(sessionId)).importUrl({ knowledgeBaseId, url })
+    writeAudit('knowledge-url-imported', JSON.stringify({ id: record.id, source: record.source }), sessionId)
+    return record
+  }
+
+  async deleteKnowledgeDocument(sessionId: string, id: string): Promise<boolean> {
+    const deleted = await (await this.knowledgeForSession(sessionId)).deleteDocument(id)
+    if (deleted) writeAudit('knowledge-document-deleted', JSON.stringify({ id }), sessionId)
+    return deleted
+  }
+
+  async rebuildKnowledgeBase(sessionId: string, id: string): Promise<KnowledgeDocumentRecord[]> {
+    const records = await (await this.knowledgeForSession(sessionId)).rebuildKnowledgeBase(id)
+    writeAudit('knowledge-base-rebuilt', JSON.stringify({ id, documents: records.length }), sessionId)
+    return records
+  }
+
+  async searchKnowledge(sessionId: string, query: string, knowledgeBaseId?: string): Promise<KnowledgeSearchHit[]> {
+    return (await this.knowledgeForSession(sessionId)).search(query, { knowledgeBaseId })
+  }
+
+  async listMemory(sessionId: string, scope?: MemoryScope): Promise<MemoryEntry[]> {
+    return this.memoryForSession(sessionId).list(scope)
+  }
+
+  async addMemory(sessionId: string, scope: MemoryScope, content: string): Promise<MemoryEntry> {
+    const record = await this.memoryForSession(sessionId).add(scope, content)
+    writeAudit('memory-added', JSON.stringify({ id: record.id, scope }), sessionId)
+    return record
+  }
+
+  async updateMemory(sessionId: string, id: string, content: string): Promise<MemoryEntry> {
+    const record = await this.memoryForSession(sessionId).update(id, content)
+    writeAudit('memory-updated', JSON.stringify({ id: record.id, scope: record.scope }), sessionId)
+    return record
+  }
+
+  async deleteMemory(sessionId: string, id: string): Promise<boolean> {
+    const deleted = await this.memoryForSession(sessionId).delete(id)
+    if (deleted) writeAudit('memory-deleted', JSON.stringify({ id }), sessionId)
+    return deleted
+  }
+
+  async searchMemory(sessionId: string, query: string, scope?: MemoryScope): Promise<MemorySearchHit[]> {
+    return this.memoryForSession(sessionId).search(query, { scope })
   }
 
   async testModel(modelId: string): Promise<{ ok: boolean; latencyMs: number; message: string }> {
@@ -247,6 +406,53 @@ export class AgentManager {
     const fallback = getModel(id) ?? getModel('qwen3.8-max') ?? BUILTIN_MODELS[0]
     const override = this.settings.getJson<Partial<ModelConfig>>(`model:${fallback.id}:override`, {})
     return { ...fallback, ...override, id: fallback.id, thinking: override.thinking ?? fallback.thinking }
+  }
+
+  private getMemoryStore(workspacePath: string): MemoryStore {
+    const key = join(workspacePath)
+    const current = this.memoryStores.get(key)
+    if (current) return current
+    const store = new MemoryStore({ workspacePath })
+    this.memoryStores.set(key, store)
+    return store
+  }
+
+  private getKnowledgeStore(workspacePath: string): Promise<KnowledgeStore> {
+    const key = join(workspacePath)
+    const current = this.knowledgeStores.get(key)
+    if (current) return current
+    const store = KnowledgeStore.open({ workspacePath, embedding: this.materializeEmbeddingConfig(this.readKnowledgeSettings()) })
+    this.knowledgeStores.set(key, store)
+    void store.catch(() => this.knowledgeStores.delete(key))
+    return store
+  }
+
+  private knowledgeForSession(sessionId: string): Promise<KnowledgeStore> {
+    const session = this.sessions.get(sessionId)
+    if (!session) throw new Error(`会话不存在: ${sessionId}`)
+    return this.getKnowledgeStore(session.workspacePath)
+  }
+
+  private memoryForSession(sessionId: string): MemoryStore {
+    const session = this.sessions.get(sessionId)
+    if (!session) throw new Error(`会话不存在: ${sessionId}`)
+    return this.getMemoryStore(session.workspacePath)
+  }
+
+  private readKnowledgeSettings(): StoredKnowledgeSettings {
+    return this.settings.getJson<StoredKnowledgeSettings>('knowledge:embedding', {
+      mode: 'local',
+      baseUrl: '',
+      model: '',
+      dimensions: 384
+    })
+  }
+
+  private materializeEmbeddingConfig(stored: StoredKnowledgeSettings): EmbeddingConfig {
+    return {
+      ...stored,
+      apiKey: this.settings.getSecret('knowledge:embeddingApiKey')
+    }
   }
 
   private resolveShell(): ShellSettings {
@@ -345,14 +551,6 @@ export class AgentManager {
   }
 }
 
-async function readOptional(path: string): Promise<string> {
-  try {
-    return await readFile(path, 'utf8')
-  } catch {
-    return ''
-  }
-}
-
 function asPromptPayload(value: unknown, fallbackContent: string, fallbackAttachments: ContentPart[]): { content: string; attachments: ContentPart[] } {
   if (!value || typeof value !== 'object') return { content: fallbackContent, attachments: fallbackAttachments }
   const record = value as Record<string, unknown>
@@ -375,4 +573,24 @@ function validateMcpConfigs(configs: McpServerConfig[]): void {
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`MCP ${config.id} URL 必须使用 HTTP(S)`)
     }
   }
+}
+
+function formatMemorySection(userMemory: string, workspaceMemory: string): string {
+  return [
+    `## 用户级长期记忆\n\n${userMemory.trim() || '当前没有用户级长期记忆。'}`,
+    `## 工作区长期记忆\n\n${workspaceMemory.trim() || '当前没有工作区长期记忆。'}`
+  ].join('\n\n')
+}
+
+function summarizeSession(events: SessionEvent[]): string {
+  const messages = events
+    .filter((event) => event.type === 'userMessage' || event.type === 'assistantMessage')
+    .slice(-8)
+    .map((event) => event.type === 'userMessage'
+      ? `用户：${event.content.trim()}`
+      : `衔星：${event.text.trim()}`)
+    .filter((value) => !value.endsWith('：'))
+  const content = messages.join('\n\n')
+  const maximum = 12_000
+  return content.length <= maximum ? content : `[较早内容已省略]\n\n${content.slice(-maximum)}`
 }
