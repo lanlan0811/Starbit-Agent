@@ -51,3 +51,14 @@
 .audit-list p { margin: var(--space-1) 0 0; overflow-wrap: anywhere; color: var(--color-text-secondary); font-size: 11px; }
 .coming-panel { display: grid; justify-items: center; gap: var(--space-2); padding: var(--space-6) 0; color: var(--color-text-secondary); text-align: center; }
 .coming-panel p { margin: 0; }
+.mcp-list { display: grid; gap: var(--space-2); }
+.mcp-card { display: grid; gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-bg-surface); }
+.mcp-card__title { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.mcp-status { padding: 1px 6px; border-radius: var(--radius-full); color: var(--color-text-secondary); background: var(--color-bg-inset); font-size: 10px; }
+.mcp-status--connected { color: var(--color-success); }
+.mcp-status--connecting { color: var(--color-primary); }
+.mcp-status--error { color: var(--color-danger); }
+.mcp-toggle,
+.mcp-tool { display: flex; align-items: center; gap: var(--space-1); color: var(--color-text-secondary); font-size: var(--font-size-caption); }
+.mcp-tool { padding-left: var(--space-2); }
+.panel-button--danger { color: var(--color-danger); }

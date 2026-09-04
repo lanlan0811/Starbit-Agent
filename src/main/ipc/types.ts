@@ -57,6 +57,10 @@ export interface IpcApi {
   skills: {
     list(workspacePath: string): Promise<Array<{ name: string; description: string; root: string; markdownPath: string; scripts: string[]; scope: 'user' | 'workspace' }>>
   }
+  mcp: {
+    list(): Promise<McpServerStateDto[]>
+    set(configs: McpServerConfigDto[]): Promise<McpServerStateDto[]>
+  }
   workspace: {
     selectFolder(): Promise<{ path: string } | null>
   }
@@ -79,6 +83,26 @@ export interface AuditDto {
   action: string
   detail?: string
   createdAt: number
+}
+
+export type McpTransportDto =
+  | { type: 'stdio'; command: string; args?: string[]; cwd?: string; env?: Record<string, string> }
+  | { type: 'streamable-http'; url: string; headers?: Record<string, string>; fallbackToSse?: boolean }
+  | { type: 'sse'; url: string; headers?: Record<string, string> }
+
+export interface McpServerConfigDto {
+  id: string
+  name: string
+  enabled: boolean
+  transport: McpTransportDto
+  disabledTools?: string[]
+}
+
+export interface McpServerStateDto {
+  config: McpServerConfigDto
+  status: 'disconnected' | 'connecting' | 'connected' | 'error'
+  tools: Array<{ name: string; title?: string; description?: string }>
+  error?: string
 }
 
 /** 主进程 → 渲染进程的推送事件通道 */

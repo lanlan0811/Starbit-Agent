@@ -16,6 +16,8 @@ import { SessionManager } from '../session/manager'
 import { createBuiltinToolRegistry, type ShellSettings } from '../tools/builtin'
 import { SkillManager } from '../skills/manager'
 import { HookRunner, type HookDefinition } from '../hooks/runner'
+import { McpManager } from '../mcp/manager'
+import type { McpServerConfig, McpServerState } from '../mcp/types'
 
 export interface PermissionPromptDto {
   requestId: string
@@ -44,6 +46,7 @@ export class AgentManager {
   private readonly active = new Map<string, AgentLoop>()
   private readonly pendingPermissions = new Map<string, PendingPermission>()
   private readonly provider = new OpenAiCompatibleProvider()
+  private readonly mcp = new McpManager()
 
   constructor(
     private readonly sessions: SessionManager,
@@ -62,6 +65,9 @@ export class AgentManager {
       const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
       if (!apiKey) throw new Error(`模型 ${model.id} 尚未配置 API Key，请在设置中完成配置。`)
       const registry = createBuiltinToolRegistry({ shell: this.resolveShell() })
+      const mcpConfigs = this.materializeMcpConfigs(this.settings.getJson<McpServerConfig[]>('mcpServers', []))
+      await this.mcp.synchronize(mcpConfigs)
+      this.mcp.registerTools(registry)
       const skills = new SkillManager({ workspacePath: session.workspacePath })
       await skills.scan()
       skills.registerTools(registry)
@@ -191,6 +197,26 @@ export class AgentManager {
     return manager.list()
   }
 
+  async listMcpServers(): Promise<McpServerState[]> {
+    const configs = this.settings.getJson<McpServerConfig[]>('mcpServers', [])
+    await this.mcp.synchronize(this.materializeMcpConfigs(configs))
+    return this.mcp.states(configs)
+  }
+
+  async setMcpServers(configs: McpServerConfig[]): Promise<McpServerState[]> {
+    validateMcpConfigs(configs)
+    const sanitized = this.protectMcpSecrets(configs)
+    this.settings.setJson('mcpServers', sanitized)
+    await this.mcp.synchronize(this.materializeMcpConfigs(sanitized))
+    writeAudit('mcp-settings-updated', JSON.stringify(redact(configs.map((config) => ({ ...config, transport: { ...config.transport, headers: undefined, env: undefined } })))))
+    return this.mcp.states(sanitized)
+  }
+
+  async shutdown(): Promise<void> {
+    for (const sessionId of this.active.keys()) this.cancel(sessionId)
+    await this.mcp.close()
+  }
+
   async testModel(modelId: string): Promise<{ ok: boolean; latencyMs: number; message: string }> {
     const model = this.resolveModel(modelId)
     const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
@@ -229,6 +255,40 @@ export class AgentManager {
     return process.platform === 'win32'
       ? { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command'] }
       : { executable: process.env.SHELL || '/bin/sh', args: ['-lc'] }
+  }
+
+  private protectMcpSecrets(configs: McpServerConfig[]): McpServerConfig[] {
+    return configs.map((config) => {
+      const copy = structuredClone(config)
+      const secretNames = this.settings.getJson<string[]>(`mcp:${copy.id}:secretNames`, [])
+      const values = copy.transport.type === 'stdio' ? copy.transport.env : copy.transport.headers
+      if (values) {
+        for (const [key, value] of Object.entries(values)) {
+          if (!/(authorization|api[-_]?key|password|secret|token)/i.test(key)) continue
+          this.settings.setSecret(`mcp:${copy.id}:${key}`, value)
+          if (!secretNames.includes(key)) secretNames.push(key)
+          delete values[key]
+        }
+      }
+      this.settings.setJson(`mcp:${copy.id}:secretNames`, secretNames)
+      return copy
+    })
+  }
+
+  private materializeMcpConfigs(configs: McpServerConfig[]): McpServerConfig[] {
+    return configs.map((config) => {
+      const copy = structuredClone(config)
+      const secretNames = this.settings.getJson<string[]>(`mcp:${copy.id}:secretNames`, [])
+      if (secretNames.length === 0) return copy
+      if (copy.transport.type === 'stdio') copy.transport.env ??= {}
+      else copy.transport.headers ??= {}
+      const target = copy.transport.type === 'stdio' ? copy.transport.env! : copy.transport.headers!
+      for (const name of secretNames) {
+        const value = this.settings.getSecret(`mcp:${copy.id}:${name}`)
+        if (value) target[name] = value
+      }
+      return copy
+    })
   }
 
   private requestPermission(
@@ -299,5 +359,20 @@ function asPromptPayload(value: unknown, fallbackContent: string, fallbackAttach
   return {
     content: typeof record.content === 'string' ? record.content : fallbackContent,
     attachments: Array.isArray(record.attachments) ? (record.attachments as ContentPart[]) : fallbackAttachments
+  }
+}
+
+function validateMcpConfigs(configs: McpServerConfig[]): void {
+  const ids = new Set<string>()
+  for (const config of configs) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(config.id)) throw new Error(`MCP ID 无效: ${config.id}`)
+    if (ids.has(config.id)) throw new Error(`MCP ID 重复: ${config.id}`)
+    ids.add(config.id)
+    if (!config.name.trim()) throw new Error(`MCP ${config.id} 缺少名称`)
+    if (config.transport.type === 'stdio' && !config.transport.command.trim()) throw new Error(`MCP ${config.id} 缺少启动命令`)
+    if (config.transport.type !== 'stdio') {
+      const url = new URL(config.transport.url)
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error(`MCP ${config.id} URL 必须使用 HTTP(S)`)
+    }
   }
 }

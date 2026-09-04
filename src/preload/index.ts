@@ -40,6 +40,10 @@ const api: IpcApi = {
   skills: {
     list: (workspacePath) => ipcRenderer.invoke('skills:list', workspacePath)
   },
+  mcp: {
+    list: () => ipcRenderer.invoke('mcp:list'),
+    set: (configs) => ipcRenderer.invoke('mcp:set', configs)
+  },
   workspace: {
     selectFolder: () => ipcRenderer.invoke('workspace:selectFolder')
   }

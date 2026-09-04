@@ -59,6 +59,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('settings:getShell', () => agents.getShell())
   ipcMain.handle('settings:setShell', (_e, shell: { executable: string; args: string[] }) => agents.setShell(shell))
   ipcMain.handle('skills:list', (_e, workspacePath: string) => agents.listSkills(workspacePath))
+  ipcMain.handle('mcp:list', () => agents.listMcpServers())
+  ipcMain.handle('mcp:set', (_e, configs: import('../mcp/types').McpServerConfig[]) => agents.setMcpServers(configs))
+  ipcMain.handle('app:shutdownServices', () => agents.shutdown())
 
   // Workspace
   ipcMain.handle('workspace:selectFolder', async () => {

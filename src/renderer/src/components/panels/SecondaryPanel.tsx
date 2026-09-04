@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen, KeyRound, Plus, RefreshCw, Save } from 'lucide-react'
-import type { AuditDto, UsageSummaryDto } from '../../../../main/ipc/types'
+import type { AuditDto, McpServerConfigDto, McpServerStateDto, UsageSummaryDto } from '../../../../main/ipc/types'
 import { useAppStore } from '../../stores/app'
 import './panels.css'
 
@@ -14,7 +14,7 @@ export function SecondaryPanel(): JSX.Element {
     <aside className="secondary-panel" aria-label={TITLES[active] ?? '功能面板'}>
       <header className="secondary-panel__header">{TITLES[active] ?? active}</header>
       <div className="secondary-panel__body">
-        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
+        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : active === 'mcp' ? <McpPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
       </div>
     </aside>
   )
@@ -162,6 +162,78 @@ function SkillsPanel(): JSX.Element {
         </article>
       ))}
       {skills.length === 0 && <EmptyText>未发现可用技能。支持 .starbit/skills 与 .claude/skills。</EmptyText>}
+    </div>
+  )
+}
+
+function McpPanel(): JSX.Element {
+  const [states, setStates] = useState<McpServerStateDto[]>([])
+  const [name, setName] = useState('')
+  const [endpoint, setEndpoint] = useState('')
+  const [transportType, setTransportType] = useState<'stdio' | 'streamable-http' | 'sse'>('stdio')
+  const [message, setMessage] = useState('')
+  useEffect(() => { void window.starbit.mcp.list().then(setStates) }, [])
+
+  const save = async (configs: McpServerConfigDto[]): Promise<void> => {
+    setMessage('正在连接…')
+    try {
+      setStates(await window.starbit.mcp.set(configs))
+      setMessage('配置已保存；工具变更将在下一会话生效。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const add = async (): Promise<void> => {
+    if (!name.trim() || !endpoint.trim()) return
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-') || crypto.randomUUID()
+    const transport = transportType === 'stdio'
+      ? { type: 'stdio' as const, command: endpoint.trim(), args: [] }
+      : { type: transportType, url: endpoint.trim(), ...(transportType === 'streamable-http' ? { fallbackToSse: true } : {}) }
+    await save([...states.map((state) => state.config), { id, name: name.trim(), enabled: true, transport }])
+    setName('')
+    setEndpoint('')
+  }
+
+  const update = async (id: string, patch: Partial<McpServerConfigDto>): Promise<void> => {
+    await save(states.map((state) => state.config.id === id ? { ...state.config, ...patch } : state.config))
+  }
+
+  return (
+    <div className="panel-stack">
+      <section className="settings-group">
+        <h3>添加服务器</h3>
+        <label>名称</label>
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="filesystem" />
+        <label>传输</label>
+        <select value={transportType} onChange={(event) => setTransportType(event.target.value as typeof transportType)}>
+          <option value="stdio">stdio</option>
+          <option value="streamable-http">Streamable HTTP</option>
+          <option value="sse">SSE（兼容）</option>
+        </select>
+        <label>{transportType === 'stdio' ? '可执行命令' : '服务 URL'}</label>
+        <input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder={transportType === 'stdio' ? 'npx' : 'https://example.com/mcp'} />
+        <button className="panel-primary-action" onClick={() => void add()}><Plus size={14} /> 添加并连接</button>
+      </section>
+      <div className="mcp-list">
+        {states.map((state) => (
+          <article className="mcp-card" key={state.config.id}>
+            <div className="mcp-card__title"><strong>{state.config.name}</strong><span className={`mcp-status mcp-status--${state.status}`}>{state.status}</span></div>
+            {state.error && <p className="panel-message">{state.error}</p>}
+            <label className="mcp-toggle"><input type="checkbox" checked={state.config.enabled} onChange={(event) => void update(state.config.id, { enabled: event.target.checked })} /> 已启用</label>
+            {state.tools.map((tool) => {
+              const disabled = state.config.disabledTools?.includes(tool.name) ?? false
+              return <label className="mcp-tool" key={tool.name}><input type="checkbox" checked={!disabled} onChange={(event) => {
+                const next = new Set(state.config.disabledTools ?? [])
+                if (event.target.checked) next.delete(tool.name); else next.add(tool.name)
+                void update(state.config.id, { disabledTools: [...next] })
+              }} /><span title={tool.description}>{tool.title || tool.name}</span></label>
+            })}
+            <button className="panel-button panel-button--danger" onClick={() => void save(states.filter((item) => item.config.id !== state.config.id).map((item) => item.config))}>移除</button>
+          </article>
+        ))}
+      </div>
+      {message && <p className="panel-message" role="status">{message}</p>}
     </div>
   )
 }
