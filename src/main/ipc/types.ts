@@ -1,4 +1,4 @@
-import type { SessionMeta } from '../session/manager'
+import type { SessionMeta } from '@core/session'
 import type { SessionEvent } from '@core/events'
 import type { PermissionMode } from '@core/events'
 import { ModelConfig } from '@core/models'

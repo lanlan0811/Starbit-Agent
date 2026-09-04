@@ -1,4 +1,5 @@
 export * from './types'
+export * from './session'
 export * from './events'
 export * from './models'
 export * from './nanoid'

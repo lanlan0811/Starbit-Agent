@@ -1,6 +1,3 @@
-import type { PermissionMode } from '../events'
-import type { ToolDefinition } from '../tools/types'
-
 /**
  * 白名单规则 —— 形如 `Bash(npm run *)`、`Write(./docs/**)` 的 allow/deny/ask 三元组。
  * 持久化存储，范畴：本次 / 本会话 / 永久。

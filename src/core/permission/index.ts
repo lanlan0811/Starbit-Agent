@@ -96,10 +96,10 @@ export class PermissionService {
     }
 
     // 3. 模式矩阵判定
-    return this.decideByMode(req, subject)
+    return this.decideByMode(req)
   }
 
-  private decideByMode(req: PermissionRequest, subject: string): Decision {
+  private decideByMode(req: PermissionRequest): Decision {
     const { mode, tool } = req
 
     // 只读操作：三模式均放行

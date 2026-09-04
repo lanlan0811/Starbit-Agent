@@ -1,10 +1,16 @@
 import { app, BrowserWindow, shell } from 'electron'
-import { join } from 'path'
+import { isAbsolute, join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { initDatabase } from './session/database'
 
 let mainWindow: BrowserWindow | null = null
+
+const configuredUserDataDir = process.env.STARBIT_USER_DATA_DIR
+if (configuredUserDataDir) {
+  if (!isAbsolute(configuredUserDataDir)) throw new Error('STARBIT_USER_DATA_DIR 必须是绝对路径')
+  app.setPath('userData', configuredUserDataDir)
+}
 
 function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({

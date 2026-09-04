@@ -1,22 +1,23 @@
 import initSqlJs, { type Database } from 'sql.js'
 import { app } from 'electron'
 import { join } from 'path'
+import { createRequire } from 'node:module'
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs'
-import type { SessionEvent, PermissionMode } from '@core/events'
+import type { SessionEvent } from '@core/events'
 
 /**
  * SQLite 数据库层 —— 全本地存储（sql.js，纯 JS/WASM，无原生编译依赖）。
  * 表：sessions（会话）、events（append-only 事件日志）、whitelist（权限白名单）、
  *      usage（用量统计）、audit_log（审计日志）、settings（设置）。
  *
- * sql.js 以内存数据库 + 磁盘文件同步的方式工作：每次写操作后标记 dirty，
- * 提供 export() 将整个库序列化落盘。为满足"全本地持久化"，采用
+ * sql.js 以内存数据库 + 磁盘文件同步的方式工作，提供 export() 将整个库
+ * 序列化落盘。为满足"全本地持久化"，采用
  * 写后立即 export 落盘策略（数据量小、桌面端可接受）。
  */
 
 let db: Database | null = null
 let dbPath = ''
-let dirty = false
+const nodeRequire = createRequire(import.meta.url)
 
 function userDataDir(): string {
   const dir = join(app.getPath('userData'))
@@ -29,7 +30,7 @@ function locateWasmFile(): string {
   const candidates = [
     join(process.resourcesPath ?? '', 'app.asar.unpacked', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
     join(__dirname, '..', '..', '..', '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
-    require.resolve?.('sql.js/dist/sql-wasm.wasm') ?? ''
+    nodeRequire.resolve('sql.js/dist/sql-wasm.wasm')
   ]
   for (const p of candidates) {
     if (p && existsSync(p)) return p
@@ -62,7 +63,6 @@ export function persist(): void {
   if (!db) return
   const data = db.export()
   writeFileSync(dbPath, Buffer.from(data))
-  dirty = false
 }
 
 function migrate(): void {
@@ -148,7 +148,6 @@ function run(sql: string, params: unknown[] = []): void {
   stmt.bind(params as never[])
   stmt.step()
   stmt.free()
-  dirty = true
 }
 
 export interface SessionRow {

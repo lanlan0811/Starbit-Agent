@@ -34,25 +34,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        # package.json scripts 约定：npm run typecheck -> tsc --noEmit
-        run: npm run typecheck
+        # package.json scripts 约定：pnpm typecheck -> tsc --noEmit
+        run: pnpm typecheck
 
       - name: Lint
-        # scripts 约定：npm run lint -> eslint 全量检查
-        run: npm run lint
+        # scripts 约定：pnpm lint -> eslint 全量检查
+        run: pnpm lint
 
       - name: Unit tests
-        # scripts 约定：npm run test:unit -> vitest run（core 层纯 TS，无需 Electron）
-        run: npm run test:unit
+        # scripts 约定：pnpm test:unit -> vitest run（core 层纯 TS，无需 Electron）
+        run: pnpm test:unit
 
   e2e:
     name: Electron E2E
@@ -61,25 +65,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Rebuild native modules for Electron
         # node-pty / better-sqlite3 等原生模块需按 Electron ABI 重编译
-        run: npx electron-builder install-app-deps
+        run: pnpm exec electron-builder install-app-deps
 
       - name: Install Playwright deps & Chromium
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb libnss3 libatk-bridge2.0-0 libgtk-3-0
 
       - name: Electron E2E tests
-        # scripts 约定：npm run test:e2e -> playwright test（_electron.launch 关键路径）
+        # scripts 约定：pnpm test:e2e -> playwright test（_electron.launch 关键路径）
         # Electron GUI 在无头环境需 xvfb 包裹
-        run: xvfb-run --auto-servernum npm run test:e2e
+        run: xvfb-run --auto-servernum pnpm test:e2e

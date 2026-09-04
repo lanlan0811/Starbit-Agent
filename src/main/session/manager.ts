@@ -1,6 +1,7 @@
 import { nanoid } from '@core/nanoid'
 import { PermissionMode } from '@core/events'
 import type { SessionEvent } from '@core/events'
+import type { SessionMeta } from '@core/session'
 import {
   createSessionRow,
   getSession,
@@ -16,15 +17,7 @@ import {
  * 每会话一 AgentLoop 实例（由 AgentLoopManager 管理）。
  */
 
-export interface SessionMeta {
-  id: string
-  title: string
-  workspacePath: string
-  mode: PermissionMode
-  model: string
-  createdAt: number
-  updatedAt: number
-}
+export type { SessionMeta } from '@core/session'
 
 export class SessionManager {
   private buffer: Map<string, SessionEvent[]> = new Map()

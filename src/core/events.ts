@@ -3,7 +3,7 @@
  * UI 渲染、resume、审计全部由重放驱动。
  */
 
-import type { JsonValue, MessageId, SessionId, ToolCallId } from './types'
+import type { JsonValue, SessionId, ToolCallId } from './types'
 
 /** 权限模式 */
 export type PermissionMode = 'plan' | 'acceptEdits' | 'fullAccess'

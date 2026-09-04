@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SessionMeta } from '../../main/session/manager'
+import type { SessionMeta } from '@core/session'
 import type { SessionEvent, PermissionMode } from '@core/events'
 import type { ModelConfig } from '@core/models'
 

@@ -27,6 +27,7 @@ export function InputArea(): JSX.Element {
   }
 
   const onFilePick = (kind: 'image' | 'video'): void => {
+    if (fileInputRef.current) fileInputRef.current.accept = `${kind}/*`
     fileInputRef.current?.click()
   }
 
