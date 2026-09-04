@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useAppStore } from '../../stores/app'
 import { PermissionMode } from '@core/events'
 import './statusbar.css'
@@ -12,7 +11,8 @@ const MODE_LABEL: Record<PermissionMode, string> = {
 /** 思考强度三档 segmented control */
 function ThinkingControl(): JSX.Element {
   const levels = ['low', 'high', 'max'] as const
-  const [level, setLevel] = useState<'low' | 'high' | 'max'>('max')
+  const level = useAppStore((state) => state.thinkingLevel)
+  const setLevel = useAppStore((state) => state.setThinkingLevel)
   return (
     <div className="statusbar__thinking">
       {levels.map((l) => (

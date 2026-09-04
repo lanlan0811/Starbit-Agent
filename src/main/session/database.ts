@@ -169,6 +169,25 @@ export interface EventRow {
   created_at: number
 }
 
+export interface UsageSummary {
+  promptTokens: number
+  cachedTokens: number
+  uncachedTokens: number
+  outputTokens: number
+  hitRate: number
+  avoidableMisses: number
+  ttlMisses: number
+  compactionMisses: number
+}
+
+export interface AuditRow {
+  id: string
+  sessionId?: string
+  action: string
+  detail?: string
+  createdAt: number
+}
+
 export function createSessionRow(row: Omit<SessionRow, 'created_at' | 'updated_at'>): void {
   const ts = Date.now()
   run(
@@ -254,6 +273,41 @@ export function recordUsage(usage: {
   persist()
 }
 
+export function getUsageSummary(sessionId?: string): UsageSummary {
+  const where = sessionId ? 'WHERE session_id = ? AND is_subagent = 0' : 'WHERE is_subagent = 0'
+  const params = sessionId ? [sessionId] : []
+  const row = get<{
+    prompt_tokens: number
+    cached_tokens: number
+    output_tokens: number
+    avoidable: number
+    ttl: number
+    compaction: number
+  }>(
+    `SELECT
+      COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+      COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+      COALESCE(SUM(output_tokens), 0) AS output_tokens,
+      COALESCE(SUM(CASE WHEN miss_category = 'avoidable' THEN 1 ELSE 0 END), 0) AS avoidable,
+      COALESCE(SUM(CASE WHEN miss_category = 'ttl' THEN 1 ELSE 0 END), 0) AS ttl,
+      COALESCE(SUM(CASE WHEN miss_category = 'compaction' THEN 1 ELSE 0 END), 0) AS compaction
+     FROM usage ${where}`,
+    params
+  )
+  const promptTokens = row?.prompt_tokens ?? 0
+  const cachedTokens = row?.cached_tokens ?? 0
+  return {
+    promptTokens,
+    cachedTokens,
+    uncachedTokens: Math.max(0, promptTokens - cachedTokens),
+    outputTokens: row?.output_tokens ?? 0,
+    hitRate: promptTokens > 0 ? cachedTokens / promptTokens : 0,
+    avoidableMisses: row?.avoidable ?? 0,
+    ttlMisses: row?.ttl ?? 0,
+    compactionMisses: row?.compaction ?? 0
+  }
+}
+
 export function writeAudit(action: string, detail?: string, sessionId?: string): void {
   run('INSERT INTO audit_log (id, session_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?)', [
     `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -262,6 +316,54 @@ export function writeAudit(action: string, detail?: string, sessionId?: string):
     detail ?? null,
     Date.now()
   ])
+  persist()
+}
+
+export function listAudit(limit = 200, sessionId?: string): AuditRow[] {
+  const safeLimit = Math.max(1, Math.min(2000, Math.trunc(limit)))
+  const rows = sessionId
+    ? all<{ id: string; session_id?: string; action: string; detail?: string; created_at: number }>(
+        'SELECT * FROM audit_log WHERE session_id = ? ORDER BY created_at DESC LIMIT ?',
+        [sessionId, safeLimit]
+      )
+    : all<{ id: string; session_id?: string; action: string; detail?: string; created_at: number }>(
+        'SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?',
+        [safeLimit]
+      )
+  return rows.map((row) => ({ id: row.id, sessionId: row.session_id, action: row.action, detail: row.detail, createdAt: row.created_at }))
+}
+
+export function listWhitelist(): import('@core/permission/rules').PermissionRule[] {
+  return all<{
+    id: string
+    semantic_label: string
+    pattern: string
+    action: import('@core/permission/rules').RuleAction
+    scope: import('@core/permission/rules').RuleScope
+    created_at: number
+    hit_count: number
+  }>('SELECT * FROM whitelist ORDER BY created_at ASC').map((row) => ({
+    id: row.id,
+    semanticLabel: row.semantic_label,
+    pattern: row.pattern,
+    action: row.action,
+    scope: row.scope,
+    createdAt: row.created_at,
+    hitCount: row.hit_count
+  }))
+}
+
+export function upsertWhitelist(rule: import('@core/permission/rules').PermissionRule): void {
+  run(
+    `INSERT OR REPLACE INTO whitelist (id, semantic_label, pattern, action, scope, created_at, hit_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [rule.id, rule.semanticLabel, rule.pattern, rule.action, rule.scope, rule.createdAt, rule.hitCount ?? 0]
+  )
+  persist()
+}
+
+export function deleteWhitelist(id: string): void {
+  run('DELETE FROM whitelist WHERE id = ?', [id])
   persist()
 }
 

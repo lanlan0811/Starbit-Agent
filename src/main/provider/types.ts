@@ -9,6 +9,13 @@ export interface ProviderMessage {
   content: string | ContentPart[]
   name?: string
   toolCallId?: string
+  toolCalls?: ProviderAssistantToolCall[]
+}
+
+export interface ProviderAssistantToolCall {
+  id: string
+  name: string
+  arguments: string
 }
 
 export interface ProviderTool {

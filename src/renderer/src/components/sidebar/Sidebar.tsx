@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { BrandMark } from '../icons/BrandMark'
 import './sidebar.css'
+import { useAppStore } from '../../stores/app'
 
 interface NavItem {
   key: string
@@ -40,6 +41,8 @@ const PANEL_ITEMS: NavItem[] = [
 ]
 
 export function Sidebar(): JSX.Element {
+  const activeSection = useAppStore((state) => state.activeSection)
+  const setActiveSection = useAppStore((state) => state.setActiveSection)
   return (
     <nav className="sidebar" aria-label="主导航">
       <div className="sidebar__group">
@@ -52,9 +55,10 @@ export function Sidebar(): JSX.Element {
         {SECTION_ITEMS.map((item) => (
           <button
             key={item.key}
-            className="sidebar__item"
+            className={`sidebar__item ${activeSection === item.key ? 'sidebar__item--active' : ''}`}
             title={item.shortcut ? `${item.label} ${item.shortcut}` : item.label}
             data-tooltip={item.shortcut ? `${item.label} ${item.shortcut}` : item.label}
+            onClick={() => setActiveSection(item.key)}
           >
             {item.icon}
           </button>

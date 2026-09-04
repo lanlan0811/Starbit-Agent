@@ -60,6 +60,17 @@ export function parseProviderEvent(payload: UnknownRecord, eventName: string | u
       name: stringOrUndefined(payload.name),
       argumentsDelta: String(payload.delta ?? '')
     })
+  } else if (type === 'response.output_item.added') {
+    const item = asRecord(payload.item)
+    if (item.type === 'function_call') {
+      events.push({
+        type: 'tool-call-delta',
+        index: numberOrZero(payload.output_index),
+        id: stringOrUndefined(item.call_id ?? item.id),
+        name: stringOrUndefined(item.name),
+        argumentsDelta: typeof item.arguments === 'string' ? item.arguments : ''
+      })
+    }
   }
 
   const choices = Array.isArray(payload.choices) ? payload.choices : []

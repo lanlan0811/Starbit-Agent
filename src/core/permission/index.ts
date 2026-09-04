@@ -56,7 +56,11 @@ export class PermissionService {
   }
 
   setRules(rules: PermissionRule[]): void {
-    this.rules = rules
+    this.rules = [...rules]
+  }
+
+  getRules(): PermissionRule[] {
+    return this.rules.map((rule) => ({ ...rule }))
   }
 
   setDangerousRules(rules: DangerousRule[]): void {
@@ -139,19 +143,22 @@ export class PermissionService {
   }
 
   /** 记录用户对 ask 的决策，把永久/会话级落地为白名单规则 */
-  recordDecision(req: PermissionRequest, outcome: 'allow' | 'deny', scope: RuleScope): void {
+  recordDecision(req: PermissionRequest, outcome: 'allow' | 'deny', scope: RuleScope): PermissionRule | undefined {
     if (scope === 'permanent' && outcome === 'allow') {
-      this.rules.push({
+      const rule: PermissionRule = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         semanticLabel: req.semanticLabel,
         pattern: req.subject,
         action: 'allow',
         scope: 'permanent',
         createdAt: Date.now()
-      })
+      }
+      this.rules.push(rule)
+      return rule
     } else if (scope === 'session' && outcome === 'allow') {
       this.sessionApprovals.add(toRuleSubject(req.semanticLabel, req.subject))
     }
+    return undefined
   }
 
   /** 是否命中本会话已批准的记录 */
@@ -169,10 +176,6 @@ export class PermissionService {
 
   private bumpHit(rule: PermissionRule): void {
     rule.hitCount = (rule.hitCount ?? 0) + 1
-  }
-
-  getRules(): PermissionRule[] {
-    return [...this.rules]
   }
 
   /** 持久化导出 */

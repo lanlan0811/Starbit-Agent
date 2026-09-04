@@ -10,20 +10,55 @@ export function InputArea(): JSX.Element {
   const models = useAppStore((s) => s.models)
   const currentModel = useAppStore((s) => s.currentModel)
   const setModel = useAppStore((s) => s.setModel)
+  const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const workspacePath = useAppStore((s) => s.workspacePath)
+  const mode = useAppStore((s) => s.mode)
+  const thinkingLevel = useAppStore((s) => s.thinkingLevel)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const canSend = value.trim().length > 0 || attachments.length > 0
 
-  const handleSend = (): void => {
-    if (!canSend) return
+  const handleSend = async (): Promise<void> => {
     if (running) {
-      // TODO: 发送停止请求
+      if (currentSessionId) await window.starbit.agent.cancel(currentSessionId)
       return
     }
-    // TODO: 发送消息给 AgentLoop
+    if (!canSend) return
+    let sessionId = currentSessionId
+    let selectedWorkspace = workspacePath
+    if (!selectedWorkspace) {
+      const selected = await window.starbit.workspace.selectFolder()
+      if (!selected) return
+      selectedWorkspace = selected.path
+      useAppStore.getState().setWorkspacePath(selected.path)
+    }
+    if (!sessionId) {
+      const session = await window.starbit.session.create(selectedWorkspace, { model: currentModel, mode })
+      sessionId = session.id
+      const state = useAppStore.getState()
+      state.setSessions([session, ...state.sessions])
+      state.setCurrentSessionId(session.id, [])
+    } else {
+      await window.starbit.session.update(sessionId, { model: currentModel, mode })
+    }
+    const message = value.trim()
+    const contentParts = attachments.map((attachment) => ({
+      kind: attachment.kind,
+      source: attachment.source,
+      mimeType: attachment.source.slice(5, attachment.source.indexOf(';'))
+    }))
     setValue('')
     setAttachments([])
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    useAppStore.getState().setAgentStatus('running')
+    try {
+      await window.starbit.agent.send(sessionId, message, contentParts, thinkingLevel)
+    } catch {
+      // 主进程已把可展示错误写入事件流。
+    } finally {
+      useAppStore.getState().setAgentStatus('idle')
+    }
   }
 
   const onFilePick = (kind: 'image' | 'video'): void => {
@@ -41,7 +76,10 @@ export function InputArea(): JSX.Element {
   const onKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      handleSend()
+      void handleSend()
+    } else if (e.key === 'Escape' && running) {
+      e.preventDefault()
+      void handleSend()
     }
   }
 
@@ -100,7 +138,7 @@ export function InputArea(): JSX.Element {
 
           <button
             className={`input-area__send ${!canSend ? 'input-area__send--disabled' : ''}`}
-            onClick={handleSend}
+            onClick={() => void handleSend()}
             title={running ? '停止 (Esc)' : '发送'}
           >
             {running ? <Square size={16} /> : <Send size={16} />}

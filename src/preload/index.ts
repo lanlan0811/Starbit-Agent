@@ -13,7 +13,29 @@ const api: IpcApi = {
     replay: (id) => ipcRenderer.invoke('session:replay', id)
   },
   models: {
-    list: () => ipcRenderer.invoke('models:list')
+    list: () => ipcRenderer.invoke('models:list'),
+    configured: () => ipcRenderer.invoke('models:configured'),
+    setApiKey: (modelId, apiKey) => ipcRenderer.invoke('models:setApiKey', modelId, apiKey),
+    testConnection: (modelId) => ipcRenderer.invoke('models:testConnection', modelId)
+  },
+  agent: {
+    send: (sessionId, content, attachments, thinkingLevel) => ipcRenderer.invoke('agent:send', sessionId, content, attachments, thinkingLevel),
+    cancel: (sessionId) => ipcRenderer.invoke('agent:cancel', sessionId)
+  },
+  permission: {
+    respond: (requestId, outcome, scope, reason) => ipcRenderer.invoke('permission:respond', requestId, outcome, scope, reason),
+    listRules: () => ipcRenderer.invoke('permission:listRules'),
+    deleteRule: (id) => ipcRenderer.invoke('permission:deleteRule', id)
+  },
+  usage: {
+    summary: (sessionId) => ipcRenderer.invoke('usage:summary', sessionId)
+  },
+  audit: {
+    list: (limit, sessionId) => ipcRenderer.invoke('audit:list', limit, sessionId)
+  },
+  settings: {
+    getShell: () => ipcRenderer.invoke('settings:getShell'),
+    setShell: (shell) => ipcRenderer.invoke('settings:setShell', shell)
   },
   workspace: {
     selectFolder: () => ipcRenderer.invoke('workspace:selectFolder')

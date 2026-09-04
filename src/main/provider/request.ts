@@ -110,10 +110,24 @@ async function toChatMessage(message: ProviderMessage, resolveMedia: MediaResolv
   }
   if (message.name) value.name = message.name
   if (message.toolCallId) value.tool_call_id = message.toolCallId
+  if (message.toolCalls?.length) {
+    value.tool_calls = message.toolCalls.map((call) => ({
+      id: call.id,
+      type: 'function',
+      function: { name: call.name, arguments: call.arguments }
+    }))
+  }
   return value
 }
 
 async function toResponsesMessage(message: ProviderMessage, resolveMedia: MediaResolver): Promise<JsonValue> {
+  if (message.role === 'tool' && message.toolCallId) {
+    return {
+      type: 'function_call_output',
+      call_id: message.toolCallId,
+      output: typeof message.content === 'string' ? message.content : JSON.stringify(message.content)
+    }
+  }
   return {
     role: message.role,
     content:

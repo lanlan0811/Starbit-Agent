@@ -22,7 +22,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     title: '衔星 | Starbit',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false

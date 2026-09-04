@@ -2,6 +2,19 @@ import { create } from 'zustand'
 import type { SessionMeta } from '@core/session'
 import type { SessionEvent, PermissionMode } from '@core/events'
 import type { ModelConfig } from '@core/models'
+import type { ThinkingLevel } from '@core/models'
+
+export interface PermissionPromptState {
+  requestId: string
+  sessionId: string
+  toolCallId: string
+  toolName: string
+  semanticLabel: string
+  subject: string
+  command?: string
+  impact: string
+  mode: PermissionMode
+}
 
 interface AppState {
   ready: boolean
@@ -14,6 +27,9 @@ interface AppState {
   currentModel: string
   mode: PermissionMode
   agentStatus: 'idle' | 'running' | 'waiting-confirmation'
+  thinkingLevel: ThinkingLevel
+  activeSection: string
+  permissionPrompt: PermissionPromptState | null
   setReady: (v: boolean) => void
   setAppVersion: (v: string) => void
   setWorkspacePath: (p: string) => void
@@ -25,6 +41,9 @@ interface AppState {
   setModel: (id: string) => void
   setMode: (m: PermissionMode) => void
   setAgentStatus: (s: AppState['agentStatus']) => void
+  setThinkingLevel: (level: ThinkingLevel) => void
+  setActiveSection: (section: string) => void
+  setPermissionPrompt: (request: PermissionPromptState | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -38,6 +57,9 @@ export const useAppStore = create<AppState>((set) => ({
   currentModel: 'qwen3.8-max',
   mode: 'fullAccess',
   agentStatus: 'idle',
+  thinkingLevel: 'max',
+  activeSection: 'sessions',
+  permissionPrompt: null,
   setReady: (v) => set({ ready: v }),
   setAppVersion: (v) => set({ appVersion: v }),
   setWorkspacePath: (p) => set({ workspacePath: p }),
@@ -49,5 +71,8 @@ export const useAppStore = create<AppState>((set) => ({
   setModels: (m) => set({ models: m }),
   setModel: (id) => set({ currentModel: id }),
   setMode: (m) => set({ mode: m }),
-  setAgentStatus: (s) => set({ agentStatus: s })
+  setAgentStatus: (s) => set({ agentStatus: s }),
+  setThinkingLevel: (level) => set({ thinkingLevel: level }),
+  setActiveSection: (section) => set({ activeSection: section }),
+  setPermissionPrompt: (request) => set({ permissionPrompt: request })
 }))

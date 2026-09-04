@@ -6,6 +6,7 @@ directories:
 files:
   - out/**
   - resources/**
+  - docs/prompts/**
 asar: true
 win:
   target:

@@ -36,6 +36,21 @@
   color: var(--color-text-primary);
 }
 
+.sidebar__item--active {
+  background: var(--color-primary-weak);
+  color: var(--color-primary);
+}
+
+.sidebar__item--active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  width: var(--size-nav-indicator);
+  height: 24px;
+  border-radius: 0 var(--radius-input) var(--radius-input) 0;
+  background: var(--color-primary);
+}
+
 .sidebar__item--brand {
   color: var(--color-primary);
   margin-bottom: var(--space-2);
