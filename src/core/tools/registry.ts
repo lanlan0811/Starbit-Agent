@@ -102,7 +102,7 @@ export function isAllowedByMode(def: ToolDefinition, mode: PermissionMode): bool
       case 'kb':
       case 'mcp':
       case 'skill':
-        return false
+        return def.readOnly === true
       default:
         return true
     }

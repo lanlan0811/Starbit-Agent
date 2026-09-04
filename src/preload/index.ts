@@ -37,6 +37,9 @@ const api: IpcApi = {
     getShell: () => ipcRenderer.invoke('settings:getShell'),
     setShell: (shell) => ipcRenderer.invoke('settings:setShell', shell)
   },
+  skills: {
+    list: (workspacePath) => ipcRenderer.invoke('skills:list', workspacePath)
+  },
   workspace: {
     selectFolder: () => ipcRenderer.invoke('workspace:selectFolder')
   }

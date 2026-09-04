@@ -54,6 +54,9 @@ export interface IpcApi {
     getShell(): Promise<{ executable: string; args: string[] }>
     setShell(shell: { executable: string; args: string[] }): Promise<void>
   }
+  skills: {
+    list(workspacePath: string): Promise<Array<{ name: string; description: string; root: string; markdownPath: string; scripts: string[]; scope: 'user' | 'workspace' }>>
+  }
   workspace: {
     selectFolder(): Promise<{ path: string } | null>
   }

@@ -14,6 +14,8 @@ import { SettingsService } from '../security/settings'
 import { getUsageSummary, listAudit, listWhitelist, recordUsage, upsertWhitelist, writeAudit } from '../session/database'
 import { SessionManager } from '../session/manager'
 import { createBuiltinToolRegistry, type ShellSettings } from '../tools/builtin'
+import { SkillManager } from '../skills/manager'
+import { HookRunner, type HookDefinition } from '../hooks/runner'
 
 export interface PermissionPromptDto {
   requestId: string
@@ -60,12 +62,16 @@ export class AgentManager {
       const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
       if (!apiKey) throw new Error(`模型 ${model.id} 尚未配置 API Key，请在设置中完成配置。`)
       const registry = createBuiltinToolRegistry({ shell: this.resolveShell() })
+      const skills = new SkillManager({ workspacePath: session.workspacePath })
+      await skills.scan()
+      skills.registerTools(registry)
       const permissions = new PermissionService(BUILTIN_DANGEROUS_RULES)
       permissions.setMode(session.mode)
       permissions.setRules(listWhitelist())
-      const [projectRules, memorySection] = await Promise.all([
+      const [projectRules, memorySection, directSkillContext] = await Promise.all([
         readOptional(join(session.workspacePath, 'AGENTS.md')),
-        readOptional(join(session.workspacePath, 'memory.md'))
+        readOptional(join(session.workspacePath, 'memory.md')),
+        skills.directContext(content)
       ])
       const assembled = await new PromptAssembler({
         workspacePath: session.workspacePath,
@@ -76,8 +82,18 @@ export class AgentManager {
         mode: session.mode,
         tools: registry.listForMode(session.mode),
         projectRules,
-        memorySection
+        memorySection,
+        skillsIndex: skills.index()
       }).assemble()
+      const hooks = new HookRunner()
+      hooks.setHooks(this.settings.getJson<HookDefinition[]>('hooks', []))
+      const promptHook = await hooks.run('UserPromptSubmit', {
+        sessionId,
+        workspacePath: session.workspacePath,
+        payload: { content, attachments }
+      })
+      if (!promptHook.allowed) throw new Error(promptHook.messages.join('\n') || 'UserPromptSubmit Hook 已阻断消息')
+      const hookedPrompt = asPromptPayload(promptHook.payload, content, attachments)
       loop = new AgentLoop({
         sessionId,
         workspacePath: session.workspacePath,
@@ -92,10 +108,27 @@ export class AgentManager {
         initialEvents: this.sessions.replay(sessionId),
         onEvent: (event) => this.recordEvent(event),
         confirm: (request) => this.requestPermission(sessionId, request),
-        onRuleChange: upsertWhitelist
+        onRuleChange: upsertWhitelist,
+        beforeToolUse: async (call) => {
+          const result = await hooks.run('PreToolUse', { sessionId, workspacePath: session.workspacePath, payload: call })
+          return { allowed: result.allowed, call: result.payload as typeof call, reason: result.messages.join('\n') }
+        },
+        afterToolUse: async (call, result) => {
+          await hooks.run('PostToolUse', {
+            sessionId,
+            workspacePath: session.workspacePath,
+            payload: { call, result: result instanceof Error ? { error: result.message } : result }
+          })
+        }
       })
       this.active.set(sessionId, loop)
-      await loop.run(content, attachments)
+      await hooks.run('SessionStart', { sessionId, workspacePath: session.workspacePath, payload: { resumed: this.sessions.replay(sessionId).length > 0 } })
+      await loop.run(
+        hookedPrompt.content,
+        hookedPrompt.attachments,
+        directSkillContext ? `<loaded-skill>\n${directSkillContext}\n</loaded-skill>` : ''
+      )
+      await hooks.run('SessionEnd', { sessionId, workspacePath: session.workspacePath, payload: { status: 'completed' } })
     } catch (error) {
       if (!loop) this.recordEvent(this.errorEvent(sessionId, error))
       throw error
@@ -150,6 +183,12 @@ export class AgentManager {
     if (!shell.executable.trim() || !Array.isArray(shell.args)) throw new Error('Shell 配置无效')
     this.settings.setJson('shell', { executable: shell.executable.trim(), args: shell.args })
     writeAudit('shell-settings-updated', JSON.stringify(redact(shell)))
+  }
+
+  async listSkills(workspacePath: string): Promise<ReturnType<SkillManager['list']>> {
+    const manager = new SkillManager({ workspacePath })
+    await manager.scan()
+    return manager.list()
   }
 
   async testModel(modelId: string): Promise<{ ok: boolean; latencyMs: number; message: string }> {
@@ -251,5 +290,14 @@ async function readOptional(path: string): Promise<string> {
     return await readFile(path, 'utf8')
   } catch {
     return ''
+  }
+}
+
+function asPromptPayload(value: unknown, fallbackContent: string, fallbackAttachments: ContentPart[]): { content: string; attachments: ContentPart[] } {
+  if (!value || typeof value !== 'object') return { content: fallbackContent, attachments: fallbackAttachments }
+  const record = value as Record<string, unknown>
+  return {
+    content: typeof record.content === 'string' ? record.content : fallbackContent,
+    attachments: Array.isArray(record.attachments) ? (record.attachments as ContentPart[]) : fallbackAttachments
   }
 }

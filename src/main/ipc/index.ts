@@ -58,6 +58,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('audit:list', (_e, limit?: number, sessionId?: string) => agents.audit(limit, sessionId))
   ipcMain.handle('settings:getShell', () => agents.getShell())
   ipcMain.handle('settings:setShell', (_e, shell: { executable: string; args: string[] }) => agents.setShell(shell))
+  ipcMain.handle('skills:list', (_e, workspacePath: string) => agents.listSkills(workspacePath))
 
   // Workspace
   ipcMain.handle('workspace:selectFolder', async () => {

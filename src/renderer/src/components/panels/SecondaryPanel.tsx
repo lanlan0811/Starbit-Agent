@@ -14,7 +14,7 @@ export function SecondaryPanel(): JSX.Element {
     <aside className="secondary-panel" aria-label={TITLES[active] ?? '功能面板'}>
       <header className="secondary-panel__header">{TITLES[active] ?? active}</header>
       <div className="secondary-panel__body">
-        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
+        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
       </div>
     </aside>
   )
@@ -143,6 +143,27 @@ function AuditPanel(): JSX.Element {
   const [rows, setRows] = useState<AuditDto[]>([])
   useEffect(() => { void window.starbit.audit.list(200).then(setRows) }, [])
   return <div className="audit-list">{rows.map((row) => <article key={row.id}><strong>{row.action}</strong><time>{new Date(row.createdAt).toLocaleString()}</time><p>{row.detail}</p></article>)}{rows.length === 0 && <EmptyText>尚无审计记录。</EmptyText>}</div>
+}
+
+function SkillsPanel(): JSX.Element {
+  const workspacePath = useAppStore((state) => state.workspacePath)
+  const [skills, setSkills] = useState<Array<{ name: string; description: string; scripts: string[]; scope: 'user' | 'workspace' }>>([])
+  useEffect(() => {
+    if (workspacePath) void window.starbit.skills.list(workspacePath).then(setSkills)
+    else setSkills([])
+  }, [workspacePath])
+  return (
+    <div className="audit-list">
+      {skills.map((skill) => (
+        <article key={`${skill.scope}:${skill.name}`}>
+          <strong>{skill.name}</strong>
+          <time>{skill.scope === 'workspace' ? '工作区技能' : '用户技能'} · {skill.scripts.length} 个脚本</time>
+          <p>{skill.description}</p>
+        </article>
+      ))}
+      {skills.length === 0 && <EmptyText>未发现可用技能。支持 .starbit/skills 与 .claude/skills。</EmptyText>}
+    </div>
+  )
 }
 
 function ComingPanel({ title }: { title: string }): JSX.Element {

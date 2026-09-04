@@ -39,6 +39,8 @@ export interface AgentLoopOptions {
   onEvent: (event: SessionEvent) => void
   confirm: (request: PermissionConfirmationRequest) => Promise<PermissionResponse>
   onRuleChange?: (rule: PermissionRule) => void
+  beforeToolUse?: (call: ToolCall) => Promise<{ allowed: boolean; call?: ToolCall; reason?: string }>
+  afterToolUse?: (call: ToolCall, result: ToolResult | Error) => Promise<void>
   grantedRoots?: string[]
   maxToolRounds?: number
 }
@@ -71,7 +73,7 @@ export class AgentLoop {
     this.controller?.abort()
   }
 
-  async run(content: string, attachments: ContentPart[] = []): Promise<void> {
+  async run(content: string, attachments: ContentPart[] = [], appendedContext = ''): Promise<void> {
     if (this.running) throw new Error('当前会话的 Agent 正在运行')
     this.running = true
     this.controller = new AbortController()
@@ -85,6 +87,7 @@ export class AgentLoop {
         ? [{ kind: 'text', text: content }, ...attachments]
         : content
       this.messages.push({ role: 'user', content: userContent })
+      if (appendedContext.trim()) this.messages.push({ role: 'system', content: appendedContext })
       await this.completeRounds()
     } catch (error) {
       if (this.controller.signal.aborted) {
@@ -165,6 +168,15 @@ export class AgentLoop {
   private async executeCalls(calls: ToolCall[]): Promise<void> {
     const prepared: Array<{ call: ToolCall; allowed: boolean; request?: PermissionRequest }> = []
     for (const call of calls) {
+      if (this.options.beforeToolUse) {
+        const hook = await this.options.beforeToolUse(call)
+        if (!hook.allowed) {
+          this.recordToolFailure(call, hook.reason || 'PreToolUse Hook 已阻断工具调用', 'rejected')
+          prepared.push({ call, allowed: false })
+          continue
+        }
+        if (hook.call) Object.assign(call, hook.call)
+      }
       const tool = this.options.registry.get(call.name)
       if (!tool) {
         this.recordToolFailure(call, `未注册工具: ${call.name}`)
@@ -223,8 +235,10 @@ export class AgentLoop {
       const content = result.untrusted ? wrapUntrusted(result.content) : result.content
       this.emitTool(call.id, 'success', content, result)
       this.messages.push({ role: 'tool', toolCallId: call.id, name: call.name, content })
+      await this.options.afterToolUse?.(call, result)
     } catch (error) {
       this.recordToolFailure(call, errorMessage(error))
+      await this.options.afterToolUse?.(call, error instanceof Error ? error : new Error(String(error)))
     }
   }
 
