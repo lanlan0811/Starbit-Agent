@@ -36,6 +36,10 @@ export class ToolRegistry {
     return this.tools.has(fullName)
   }
 
+  get(fullName: string): ToolDefinition | undefined {
+    return this.tools.get(fullName)?.def
+  }
+
   /** 按权限模式过滤后的工具列表（会话期冻结后复用） */
   listForMode(mode: PermissionMode): ToolDefinition[] {
     const result: ToolDefinition[] = []
@@ -89,7 +93,7 @@ export function isAllowedByMode(def: ToolDefinition, mode: PermissionMode): bool
       case 'write':
       case 'edit':
         // 计划文档是否放行由运行时判定（依赖输入路径），此处保留定义参与工具列表
-        return def.name === 'Write' || def.name === 'Edit'
+        return def.semanticLabel === 'Write' || def.semanticLabel === 'Edit' || def.semanticLabel === 'Mkdir'
       case 'shell':
       case 'browser':
       case 'sandbox':

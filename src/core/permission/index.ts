@@ -30,6 +30,8 @@ export interface PermissionRequest {
   mode: PermissionMode
   /** 完整命令（用于危险判定，shell 时提供解析后实际命令） */
   rawCommand?: string
+  /** 创建文件夹在计划模式下属于明确放行操作 */
+  createsDirectory?: boolean
 }
 
 export class PermissionService {
@@ -73,6 +75,10 @@ export class PermissionService {
   decide(req: PermissionRequest): Decision {
     const subject = toRuleSubject(req.semanticLabel, req.subject)
 
+    if (this.isSessionApproved(req.semanticLabel, req.subject)) {
+      return { verdict: 'allow', reason: 'whitelist' }
+    }
+
     // 1. 危险命令判定（优先且不可被规则覆盖的 block）
     if (req.rawCommand || req.tool.kind === 'shell' || req.tool.semanticLabel === 'Bash') {
       const cmd = req.rawCommand ?? req.subject
@@ -107,6 +113,9 @@ export class PermissionService {
 
     // 计划文档：计划模式下放行创建与编辑
     if (mode === 'plan') {
+      if (req.createsDirectory || req.semanticLabel === 'Mkdir') {
+        return { verdict: 'allow', reason: 'mode' }
+      }
       const isDoc = tool.kind === 'write' || tool.kind === 'edit'
       if (isDoc) {
         if (this.isPlanDoc(req.subject)) return { verdict: 'allow', reason: 'mode' }
@@ -125,7 +134,7 @@ export class PermissionService {
     }
 
     // fullAccess
-    if (tool.dangerLevel === 2 || tool.kind === 'shell') return { verdict: 'ask', reason: 'fallback' }
+    if (tool.dangerLevel === 2) return { verdict: 'ask', reason: 'fallback' }
     return { verdict: 'allow', reason: 'mode' }
   }
 

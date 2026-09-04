@@ -22,14 +22,14 @@ export interface DangerousRule {
  */
 export const BUILTIN_DANGEROUS_RULES: DangerousRule[] = [
   { id: 'rm-force-recursive', pattern: '\\brm\\s+(-[a-z]*f[a-z\\s-]*r|-r[a-z\\s-]*f)', description: '强制递归删除（rm -rf）', severity: 'block' },
-  { id: 'del-recursive', pattern: '(?i)\\b(rmdir|del)\\s+/[s]/[q]|\\bRemove-Item\\s+-Recurse', description: 'Windows 递归删除命令', severity: 'block' },
-  { id: 'format-disk', pattern: '(?i)\\bform(\\sat)?\\s+[a-z]:|\\bformat\\b', description: '磁盘格式化', severity: 'block' },
+  { id: 'del-recursive', pattern: '\\b(rmdir|del)\\s+/[s]/[q]|\\bRemove-Item\\s+[^\\r\\n]*-Recurse', description: 'Windows 递归删除命令', severity: 'block' },
+  { id: 'format-disk', pattern: '\\bformat(?:\\.com)?\\s+[a-z]:', description: '磁盘格式化', severity: 'block' },
   { id: 'pipe-curl-sh', pattern: '\\bcurl\\b.*\\|\\s*(ba)?sh\\b', description: 'curl 管道到 shell 执行', severity: 'warn' },
   { id: 'pipe-wget-sh', pattern: '\\bwget\\b.*\\|\\s*(ba)?sh\\b', description: 'wget 管道到 shell 执行', severity: 'warn' },
-  { id: 'registry-edit', pattern: '(?i)\\breg\\s+(add|delete)\\b|\\bSet-ItemProperty\\b.*\\bHKLM', description: '注册表修改', severity: 'warn' },
-  { id: 'privilege-escalation', pattern: '(?i)\\b(runas\\s+/user:administrator|sudo\\b|Start-Process\\s+-Verb\\s+RunAs)', description: '提权操作', severity: 'block' },
+  { id: 'registry-edit', pattern: '\\breg\\s+(add|delete)\\b|\\bSet-ItemProperty\\b.*\\bHKLM', description: '注册表修改', severity: 'warn' },
+  { id: 'privilege-escalation', pattern: '\\b(runas\\s+/user:administrator|sudo\\b|Start-Process\\s+-Verb\\s+RunAs)', description: '提权操作', severity: 'block' },
   { id: 'wipe-root', pattern: '^\\s*(rm\\s+-rf\\s+/|rmdir\\s+/s\\s+[a-z]:\\\\|Remove-Item\\s+-Recurse\\s+[A-Z]:\\\\)', description: '清空根目录/整盘', severity: 'block' },
-  { id: 'diskpart-clean', pattern: '(?i)\\bdiskpart\\b.*\\bclean\\b|\\bclean\\s+all\\b', description: '磁盘分区清理', severity: 'block' }
+  { id: 'diskpart-clean', pattern: '\\bdiskpart\\b.*\\bclean\\b|\\bclean\\s+all\\b', description: '磁盘分区清理', severity: 'block' }
 ]
 
 /** 规则引擎：对命令匹配危险规则 */

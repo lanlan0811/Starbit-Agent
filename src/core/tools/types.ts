@@ -33,6 +33,8 @@ export interface ToolDefinition {
   description: string
   /** 入口 schema（input 校验） */
   inputSchema: ToolInputSchema
+  /** 传给 OpenAI 兼容端点的 JSON Schema；与 inputSchema 保持一致 */
+  inputJsonSchema: JsonValue
   /** 权限种类 */
   kind: ToolKind
   /** 仅只读（可并行安全执行） */
@@ -64,6 +66,8 @@ export interface ToolContext {
   mode: string
   /** 环境变量 */
   env?: Record<string, string>
+  /** 用户显式授权的工作区外根目录 */
+  grantedRoots?: string[]
   /** 子代理隔离标记 */
   isSubagent?: boolean
   /** 取消信号 */

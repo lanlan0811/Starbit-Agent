@@ -1,0 +1,12 @@
+version: 1
+# 自定义危险命令规则。内置规则始终生效；这里的规则会在启动时合并。
+# severity 可选 warn（每次确认）或 block（直接拒绝）。
+rules:
+  - id: powershell-encoded-command
+    pattern: "\\b(powershell|pwsh)(?:\\.exe)?\\b[^\\r\\n]*\\s-(enc|encodedcommand)\\b"
+    description: PowerShell 编码命令可能隐藏真实操作
+    severity: warn
+  - id: windows-shadow-copy-delete
+    pattern: "\\bvssadmin\\s+delete\\s+shadows\\b"
+    description: 删除系统卷影副本
+    severity: block
