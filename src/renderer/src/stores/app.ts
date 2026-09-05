@@ -47,6 +47,8 @@ interface AppState {
   rightPanel: 'browser' | 'terminal' | null
   /** 文件树面板请求输入框插入的 @引用（消费后清空） */
   pendingFileRef: string | null
+  /** 界面语言（zh-CN 默认，localStorage 持久化） */
+  language: 'zh-CN' | 'en-US'
   setReady: (v: boolean) => void
   setAppVersion: (v: string) => void
   setWorkspacePath: (p: string) => void
@@ -70,6 +72,17 @@ interface AppState {
   setRightPanel: (panel: AppState['rightPanel']) => void
   queueFileRef: (path: string) => void
   consumeFileRef: () => string | null
+  setLanguage: (language: 'zh-CN' | 'en-US') => void
+}
+
+const LANGUAGE_KEY = 'starbit:language'
+
+function initialLanguage(): 'zh-CN' | 'en-US' {
+  try {
+    return localStorage.getItem(LANGUAGE_KEY) === 'en-US' ? 'en-US' : 'zh-CN'
+  } catch {
+    return 'zh-CN'
+  }
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -94,6 +107,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   cacheDiagnostics: [],
   rightPanel: null,
   pendingFileRef: null,
+  language: initialLanguage(),
   setReady: (v) => set({ ready: v }),
   setAppVersion: (v) => set({ appVersion: v }),
   setWorkspacePath: (p) => set({ workspacePath: p }),
@@ -128,5 +142,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     const value = get().pendingFileRef
     if (value !== null) set({ pendingFileRef: null })
     return value
+  },
+  setLanguage: (language) => {
+    try { localStorage.setItem(LANGUAGE_KEY, language) } catch { /* 持久化失败时仅本会话生效 */ }
+    set({ language })
   }
 }))

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AtSign, Film, Image, Paperclip, Send, Square, X } from 'lucide-react'
 import type { WorkspaceEntryDto } from '../../../../main/workspace/list'
 import { useAppStore } from '../../stores/app'
+import { useT } from '../../i18n'
 import './input.css'
 
 interface Attachment {
@@ -15,6 +16,7 @@ const MAX_ATTACHMENTS = 8
 const SUGGESTION_LIMIT = 8
 
 export function InputArea(): JSX.Element {
+  const { t } = useT()
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [fileRefs, setFileRefs] = useState<string[]>([])
@@ -213,7 +215,7 @@ export function InputArea(): JSX.Element {
       {fileRefs.length > 0 && (
         <div className="input-area__attachments">
           {fileRefs.map((ref) => (
-            <div key={ref} className="input-area__chip input-area__chip--ref" title={`引用文件 ${ref}`}>
+            <div key={ref} className="input-area__chip input-area__chip--ref" title={t('input.refFile', { path: ref })}>
               <AtSign size={11} />
               <span>{ref}</span>
               <button onClick={() => setFileRefs((arr) => arr.filter((item) => item !== ref))}><X size={11} /></button>
@@ -236,7 +238,7 @@ export function InputArea(): JSX.Element {
         <textarea
           ref={textareaRef}
           className="input-area__textarea"
-          placeholder="描述你的任务，支持 /命令 和 @文件..."
+          placeholder={t('input.placeholder')}
           value={value}
           onChange={onInput}
           onKeyDown={onKeyDown}
@@ -248,7 +250,7 @@ export function InputArea(): JSX.Element {
         />
 
         {mention && mentionCandidates.length > 0 && (
-          <ul className="input-area__mention" role="listbox" aria-label="引用文件候选">
+          <ul className="input-area__mention" role="listbox" aria-label={t('input.refCandidates')}>
             {mentionCandidates.map((candidate, index) => (
               <li key={candidate.path} role="option" aria-selected={index === highlightIndex} className={index === highlightIndex ? 'is-active' : ''}>
                 <button
@@ -266,18 +268,18 @@ export function InputArea(): JSX.Element {
 
         <div className="input-area__toolbar">
           <div className="input-area__tools">
-            <button className="input-area__tool" title="添加附件" onClick={() => pasteFileRef.current?.click()}>
+            <button className="input-area__tool" title={t('input.addAttachment')} onClick={() => pasteFileRef.current?.click()}>
               <Paperclip size={16} />
             </button>
-            <button className="input-area__tool" title="添加图片" onClick={() => onFilePick('image')}>
+            <button className="input-area__tool" title={t('input.addImage')} onClick={() => onFilePick('image')}>
               <Image size={16} />
             </button>
-            <button className="input-area__tool" title="添加视频" onClick={() => onFilePick('video')}>
+            <button className="input-area__tool" title={t('input.addVideo')} onClick={() => onFilePick('video')}>
               <Film size={16} />
             </button>
             <button
               className="input-area__tool"
-              title="引用文件（输入 @ 触发）"
+              title={t('input.addReference')}
               onClick={() => {
                 textareaRef.current?.focus()
                 const current = value
@@ -294,7 +296,7 @@ export function InputArea(): JSX.Element {
             className="input-area__model"
             value={currentModel}
             onChange={(e) => setModel(e.target.value)}
-            title="选择模型"
+            title={t('input.chooseModel')}
           >
             {models.map((m) => (
               <option key={m.id} value={m.id}>
@@ -306,7 +308,7 @@ export function InputArea(): JSX.Element {
           <button
             className={`input-area__send ${!canSend ? 'input-area__send--disabled' : ''}`}
             onClick={() => void handleSend()}
-            title={running ? '停止 (Esc)' : '发送'}
+            title={running ? t('input.stop') : t('input.send')}
           >
             {running ? <Square size={16} /> : <Send size={16} />}
           </button>

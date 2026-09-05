@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, FileText, Folder, RefreshCw, X } from 'lucide-react'
 import type { WorkspaceEntryDto } from '../../../../main/workspace/list'
 import { useAppStore } from '../../stores/app'
+import { useT } from '../../i18n'
 
 interface TreeNode {
   entry: WorkspaceEntryDto
@@ -11,6 +12,7 @@ interface TreeNode {
 
 /** 二级面板 — 工作区文件树：展开折叠、文件预览、一键插入 @引用。 */
 export function FilesPanel(): JSX.Element {
+  const { t } = useT()
   const workspacePath = useAppStore((state) => state.workspacePath)
   const [entries, setEntries] = useState<WorkspaceEntryDto[] | null>(null)
   const [error, setError] = useState('')
@@ -61,15 +63,15 @@ export function FilesPanel(): JSX.Element {
     useAppStore.getState().queueFileRef(entry.path)
   }
 
-  if (!workspacePath) return <p className="panel-empty">先选择工作区会话，即可浏览文件树。</p>
+  if (!workspacePath) return <p className="panel-empty">{t('files.empty')}</p>
   if (error) return <div className="panel-stack"><p className="panel-empty">{error}</p><button className="panel-button" onClick={() => void refresh()}><RefreshCw size={14} /> 重试</button></div>
-  if (!entries) return <p className="panel-empty">正在读取文件树…</p>
+  if (!entries) return <p className="panel-empty">{t('files.loading')}</p>
 
   return (
     <div className="panel-stack files-panel">
       <div className="files-panel__toolbar">
-        <span className="files-panel__count">{entries.filter((entry) => !entry.isDir).length} 个文件</span>
-        <button className="panel-button" onClick={() => void refresh()} title="刷新"><RefreshCw size={13} /></button>
+        <span className="files-panel__count">{t('files.count', { count: entries.filter((entry) => !entry.isDir).length })}</span>
+        <button className="panel-button" onClick={() => void refresh()} title={t('common.refresh')}><RefreshCw size={13} /></button>
       </div>
       <div className="files-tree" role="tree">
         {tree.map((node) => (
@@ -84,15 +86,15 @@ export function FilesPanel(): JSX.Element {
             activePath={preview?.path}
           />
         ))}
-        {tree.length === 0 && <p className="panel-empty">工作区为空或全部目录被忽略。</p>}
+        {tree.length === 0 && <p className="panel-empty">{t('files.emptyWorkspace')}</p>}
       </div>
       {(preview || previewError) && (
-        <div className="files-preview" role="dialog" aria-label="文件预览">
+        <div className="files-preview" role="dialog" aria-label={t('files.preview')}>
           <header>
             <FileText size={13} />
-            <span title={preview?.path}>{preview?.path ?? '预览失败'}</span>
-            {preview?.truncated && <em className="files-preview__badge">已截断</em>}
-            <button onClick={() => { setPreview(null); setPreviewError('') }} title="关闭预览"><X size={13} /></button>
+            <span title={preview?.path}>{preview?.path ?? t('files.previewFailed')}</span>
+            {preview?.truncated && <em className="files-preview__badge">{t('files.truncatedBadge')}</em>}
+            <button onClick={() => { setPreview(null); setPreviewError('') }} title={t('common.close')}><X size={13} /></button>
           </header>
           {previewError && <p className="panel-empty">{previewError}</p>}
           {preview && <pre>{preview.content}</pre>}
@@ -111,6 +113,7 @@ function TreeRow(props: {
   onQuote: (entry: WorkspaceEntryDto) => void
   activePath?: string
 }): JSX.Element {
+  const { t } = useT()
   const { node, depth, expandedPaths, onToggle, onPreview, onQuote, activePath } = props
   const isOpen = expandedPaths.has(node.entry.path)
   return (
@@ -122,7 +125,7 @@ function TreeRow(props: {
         style={{ paddingLeft: `${8 + depth * 14}px` }}
       >
         {node.entry.isDir ? (
-          <button className="files-tree__caret" onClick={() => onToggle(node.entry.path)} aria-label={isOpen ? '折叠目录' : '展开目录'}>
+          <button className="files-tree__caret" onClick={() => onToggle(node.entry.path)} aria-label={isOpen ? t('files.collapse') : t('files.expand')}>
             <ChevronRight size={12} className={isOpen ? 'is-open' : ''} />
             <Folder size={13} />
           </button>
@@ -133,7 +136,7 @@ function TreeRow(props: {
         )}
         <span className="files-tree__name" onClick={() => (node.entry.isDir ? onToggle(node.entry.path) : void onPreview(node.entry))}>{node.entry.name}</span>
         {!node.entry.isDir && (
-          <button className="files-tree__quote" onClick={() => onQuote(node.entry)} title="插入 @引用到输入框">@</button>
+          <button className="files-tree__quote" onClick={() => onQuote(node.entry)} title={t('files.quote')}>@</button>
         )}
       </div>
       {node.entry.isDir && isOpen && node.children.map((child) => (

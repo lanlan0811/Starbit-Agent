@@ -1,5 +1,6 @@
 import { Check, X, Loader2, AlertTriangle } from 'lucide-react'
 import type { ToolCall, ToolResultEvent, ToolStatus } from '@core/events'
+import { useT } from '../../../i18n'
 import './tool.css'
 
 const STATUS_META: Record<ToolStatus, { color: string; icon: JSX.Element }> = {
@@ -11,6 +12,7 @@ const STATUS_META: Record<ToolStatus, { color: string; icon: JSX.Element }> = {
 }
 
 export function ToolMessage({ event, toolCalls = {} }: { event: ToolResultEvent; toolCalls?: Record<string, ToolCall> }): JSX.Element {
+  const { t } = useT()
   const r = event.result
   const meta = STATUS_META[r.status]
   const call = toolCalls[r.toolCallId]
@@ -22,15 +24,15 @@ export function ToolMessage({ event, toolCalls = {} }: { event: ToolResultEvent;
         <span className="tool__status" style={{ color: meta.color }}>
           {meta.icon}
         </span>
-        <span className="tool__name">{call?.name ?? '工具'}</span>
+        <span className="tool__name">{call?.name ?? t('chat.tool')}</span>
         {subject && <span className="tool__path" title={subject}>{subject}</span>}
-        {r.outputFile && <span className="tool__path">输出已落盘</span>}
-        {r.truncated && <span className="tool__truncated">已截断</span>}
+        {r.outputFile && <span className="tool__path">{t('chat.outputSaved')}</span>}
+        {r.truncated && <span className="tool__truncated">{t('chat.truncated')}</span>}
       </div>
       {r.diff && <DiffView diff={r.diff} />}
       {r.content && (
         <details className="tool__details">
-          <summary>查看详情</summary>
+          <summary>{t('chat.viewDetails')}</summary>
           <pre className="tool__content">{r.content}</pre>
         </details>
       )}
@@ -40,13 +42,14 @@ export function ToolMessage({ event, toolCalls = {} }: { event: ToolResultEvent;
 
 /** unified diff 渲染：按行着色，折叠展示避免打断阅读。 */
 function DiffView({ diff }: { diff: string }): JSX.Element {
+  const { t } = useT()
   const lines = diff.split('\n')
   const added = lines.filter((line) => line.startsWith('+') && !line.startsWith('+++')).length
   const removed = lines.filter((line) => line.startsWith('-') && !line.startsWith('---')).length
   return (
     <details className="tool__diff">
       <summary>
-        <span className="tool__diff-added">+{added}</span> <span className="tool__diff-removed">−{removed}</span> 查看变更
+        <span className="tool__diff-added">+{added}</span> <span className="tool__diff-removed">−{removed}</span> {t('chat.viewDiff')}
       </summary>
       <pre className="tool__diff-code">
         {lines.map((line, index) => (

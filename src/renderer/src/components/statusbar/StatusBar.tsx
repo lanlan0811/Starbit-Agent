@@ -1,11 +1,12 @@
 import { useAppStore } from '../../stores/app'
 import { PermissionMode } from '@core/events'
+import { useT } from '../../i18n'
 import './statusbar.css'
 
-const MODE_LABEL: Record<PermissionMode, string> = {
-  plan: '计划',
-  acceptEdits: '自动编辑',
-  fullAccess: '完全访问'
+const MODE_KEY: Record<PermissionMode, string> = {
+  plan: 'mode.plan',
+  acceptEdits: 'mode.acceptEdits',
+  fullAccess: 'mode.fullAccess'
 }
 
 /** 思考强度三档 segmented control */
@@ -25,6 +26,7 @@ function ThinkingControl(): JSX.Element {
 }
 
 export function StatusBar(): JSX.Element {
+  const { t } = useT()
   const mode = useAppStore((s) => s.mode)
   const setMode = useAppStore((s) => s.setMode)
   const currentModel = useAppStore((s) => s.currentModel)
@@ -33,12 +35,18 @@ export function StatusBar(): JSX.Element {
   const contextStatus = useAppStore((s) => s.contextStatus)
   const cacheDiagnostic = useAppStore((s) => s.cacheDiagnostic)
 
-  const statusText = agentStatus === 'running' ? '运行中' : agentStatus === 'waiting-confirmation' ? '等待确认' : '空闲'
+  const statusText = agentStatus === 'running' ? t('status.running') : agentStatus === 'waiting-confirmation' ? t('status.waiting') : t('status.idle')
   const modeColor =
     mode === 'plan' ? 'var(--color-primary)' : mode === 'acceptEdits' ? 'var(--color-success)' : 'var(--color-warning)'
   const contextPercentage = Math.round((contextStatus?.ratio ?? 0) * 100)
   const cachePercentage = cacheDiagnostic ? cacheDiagnostic.hitRate * 100 : null
   const cacheState = cachePercentage === null ? 'neutral' : cachePercentage >= 95 ? 'green' : 'yellow'
+  const cacheTooltip = cacheDiagnostic
+    ? t('status.cacheDetail', {
+        category: cacheDiagnostic.missCategory ? t(`usage.miss${cacheDiagnostic.missCategory === 'avoidable' ? 'Avoidable' : cacheDiagnostic.missCategory === 'ttl' ? 'Ttl' : 'Compaction'}`) : t('status.missNone'),
+        sections: cacheDiagnostic.changedSections.join(', ') || t('status.missNone')
+      })
+    : t('status.cacheNoData')
 
   return (
     <footer className={`statusbar ${agentStatus === 'waiting-confirmation' ? 'statusbar--waiting' : ''}`}>
@@ -46,14 +54,14 @@ export function StatusBar(): JSX.Element {
         <button
           className="statusbar__mode"
           style={{ color: modeColor, borderColor: modeColor }}
-          title="切换权限模式"
+          title={t('status.switchMode')}
           onClick={() => setMode(mode === 'plan' ? 'acceptEdits' : mode === 'acceptEdits' ? 'fullAccess' : 'plan')}
         >
-          {MODE_LABEL[mode]} <span className="statusbar__chev">▼</span>
+          {t(MODE_KEY[mode])} <span className="statusbar__chev">▼</span>
         </button>
 
-        <span className="statusbar__model" title="当前模型">
-          {currentModel || '未选择模型'}
+        <span className="statusbar__model" title={t('status.currentModel')}>
+          {currentModel || t('status.noModel')}
         </span>
 
         <ThinkingControl />
@@ -67,13 +75,13 @@ export function StatusBar(): JSX.Element {
           <span className="statusbar__ctx-text">{contextPercentage}%</span>
         </div>
 
-        <button className="statusbar__cache" title={cacheDiagnostic ? `miss 分类：${cacheDiagnostic.missCategory ?? '无'}；前缀变化：${cacheDiagnostic.changedSections.join(', ') || '无'}` : '尚无缓存用量数据'} onClick={() => useAppStore.getState().setActiveSection('usage')}>
+        <button className="statusbar__cache" title={cacheTooltip} onClick={() => useAppStore.getState().setActiveSection('usage')}>
           <span className={`statusbar__dot statusbar__dot--${cacheState}`} />
-          命中率 {cachePercentage === null ? '—' : `${cachePercentage.toFixed(1)}%`}
+          {t('status.hitRate')} {cachePercentage === null ? '—' : `${cachePercentage.toFixed(1)}%`}
         </button>
 
-        <label className="statusbar__workspace" title="工作区路径">
-          {workspacePath || '未打开工作区'}
+        <label className="statusbar__workspace" title={t('status.workspace')}>
+          {workspacePath || t('status.noWorkspace')}
         </label>
 
         <span className={`statusbar__agent statusbar__agent--${agentStatus}`}>{statusText}</span>

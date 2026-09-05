@@ -2,9 +2,11 @@ import { AlertTriangle, ShieldCheck, X } from 'lucide-react'
 import { useState } from 'react'
 import type { RuleScope } from '@core/permission/rules'
 import { useAppStore } from '../../stores/app'
+import { useT } from '../../i18n'
 import './permission.css'
 
 export function PermissionDialog(): JSX.Element | null {
+  const { t } = useT()
   const request = useAppStore((state) => state.permissionPrompt)
   const setRequest = useAppStore((state) => state.setPermissionPrompt)
   const [busy, setBusy] = useState(false)
@@ -27,26 +29,26 @@ export function PermissionDialog(): JSX.Element | null {
         <header className="permission-dialog__header">
           <span className="permission-dialog__icon"><AlertTriangle size={20} /></span>
           <div>
-            <h2 id="permission-title">需要确认操作</h2>
+            <h2 id="permission-title">{t('permission.title')}</h2>
             <p>{request.toolName} · {request.mode}</p>
           </div>
-          <button className="permission-dialog__close" title="拒绝" disabled={busy} onClick={() => void respond('deny', 'once')}>
+          <button className="permission-dialog__close" title={t('permission.deny')} disabled={busy} onClick={() => void respond('deny', 'once')}>
             <X size={18} />
           </button>
         </header>
         <div className="permission-dialog__body">
-          <label>目标</label>
+          <label>{t('permission.subject')}</label>
           <code>{request.subject}</code>
-          <label>实际影响</label>
+          <label>{t('permission.impact')}</label>
           <pre>{request.impact}</pre>
-          {request.command && <><label>完整命令</label><pre>{request.command}</pre></>}
+          {request.command && <><label>{t('permission.command')}</label><pre>{request.command}</pre></>}
         </div>
         <footer className="permission-dialog__actions">
-          <button className="button button--ghost" disabled={busy} onClick={() => void respond('deny', 'once')}>拒绝</button>
+          <button className="button button--ghost" disabled={busy} onClick={() => void respond('deny', 'once')}>{t('permission.deny')}</button>
           <button className="button button--secondary" disabled={busy} onClick={() => void respond('allow', 'session')}>
-            <ShieldCheck size={15} /> 本会话允许
+            <ShieldCheck size={15} /> {t('permission.allowSession')}
           </button>
-          <button className="button button--primary" disabled={busy} onClick={() => void respond('allow', 'once')}>允许一次</button>
+          <button className="button button--primary" disabled={busy} onClick={() => void respond('allow', 'once')}>{t('permission.allowOnce')}</button>
         </footer>
       </section>
     </div>
