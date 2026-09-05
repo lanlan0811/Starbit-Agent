@@ -62,6 +62,12 @@ export function ModelEditor(): JSX.Element {
     <select id="model-modalities" value={draft.modalities.join(',')} onChange={(event) => change({ modalities: event.target.value.split(',') as ModelConfig['modalities'] })}>
       <option value="text">文本</option><option value="text,image">文本与图片</option><option value="text,image,video">文本、图片与视频</option>
     </select>
+    <label htmlFor="model-price-input">单价估算：输入 ¥/百万 tokens</label>
+    <input id="model-price-input" type="number" min={0} step="0.1" value={draft.pricing?.inputPerMillion ?? 0} onChange={(event) => change({ pricing: { cachedInputPerMillion: draft.pricing?.cachedInputPerMillion ?? 0, outputPerMillion: draft.pricing?.outputPerMillion ?? 0, inputPerMillion: Number(event.target.value) } })} />
+    <label htmlFor="model-price-cached">缓存命中输入 ¥/百万 tokens</label>
+    <input id="model-price-cached" type="number" min={0} step="0.1" value={draft.pricing?.cachedInputPerMillion ?? 0} onChange={(event) => change({ pricing: { inputPerMillion: draft.pricing?.inputPerMillion ?? 0, outputPerMillion: draft.pricing?.outputPerMillion ?? 0, cachedInputPerMillion: Number(event.target.value) } })} />
+    <label htmlFor="model-price-output">输出 ¥/百万 tokens</label>
+    <input id="model-price-output" type="number" min={0} step="0.1" value={draft.pricing?.outputPerMillion ?? 0} onChange={(event) => change({ pricing: { inputPerMillion: draft.pricing?.inputPerMillion ?? 0, cachedInputPerMillion: draft.pricing?.cachedInputPerMillion ?? 0, outputPerMillion: Number(event.target.value) } })} />
     <details><summary>三档思考参数（JSON）</summary><textarea aria-label="三档思考参数" rows={12} value={thinking} onChange={(event) => setThinking(event.target.value)} /></details>
     <div className="panel-actions">
       <button className="panel-button" disabled={busy || !draft.id.trim() || !draft.name.trim()} onClick={() => void save()}><Save size={14} /> 保存模型</button>

@@ -308,6 +308,36 @@ export function getUsageSummary(sessionId?: string): UsageSummary {
   }
 }
 
+export interface UsageModelRow {
+  model: string
+  promptTokens: number
+  cachedTokens: number
+  outputTokens: number
+  requests: number
+}
+
+/** 按模型聚合的用量（主会话或子代理口径）。 */
+export function getUsageByModel(isSubagent: boolean, sessionId?: string): UsageModelRow[] {
+  const where = sessionId ? 'WHERE session_id = ? AND is_subagent = ?' : 'WHERE is_subagent = ?'
+  const params = sessionId ? [sessionId, isSubagent ? 1 : 0] : [isSubagent ? 1 : 0]
+  const rows = all<{ model: string; prompt_tokens: number; cached_tokens: number; output_tokens: number; requests: number }>(
+    `SELECT model,
+      COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+      COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+      COALESCE(SUM(output_tokens), 0) AS output_tokens,
+      COUNT(*) AS requests
+     FROM usage ${where} GROUP BY model ORDER BY prompt_tokens DESC`,
+    params
+  )
+  return rows.map((row) => ({
+    model: row.model,
+    promptTokens: row.prompt_tokens,
+    cachedTokens: row.cached_tokens,
+    outputTokens: row.output_tokens,
+    requests: row.requests
+  }))
+}
+
 export function writeAudit(action: string, detail?: string, sessionId?: string): void {
   run('INSERT INTO audit_log (id, session_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?)', [
     `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

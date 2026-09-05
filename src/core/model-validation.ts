@@ -21,7 +21,12 @@ const schema = z.object({
   forcedThinking: z.boolean(), multimodalThinkingVerified: z.boolean(),
   samplingWhitelist: z.array(z.string()).optional(), usageCachedTokensPath: z.string().optional(),
   usageCacheScope: z.enum(['top', 'nested']).optional(),
-  reasoning: z.object({ clearThinking: z.boolean().optional(), keep: z.boolean().optional(), preserveThinking: z.boolean().optional() }).strict().optional()
+  reasoning: z.object({ clearThinking: z.boolean().optional(), keep: z.boolean().optional(), preserveThinking: z.boolean().optional() }).strict().optional(),
+  pricing: z.object({
+    inputPerMillion: z.number().min(0).max(100000),
+    cachedInputPerMillion: z.number().min(0).max(100000),
+    outputPerMillion: z.number().min(0).max(100000)
+  }).strict().optional()
 }).strict().refine((model) => model.maxOutputTokens < model.contextWindow, '输出上限必须小于上下文窗口')
 
 export function validateModelConfig(value: unknown): ModelConfig {

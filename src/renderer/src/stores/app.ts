@@ -42,6 +42,8 @@ interface AppState {
   streamingThinking: string
   contextStatus: ContextStatus | null
   cacheDiagnostic: CacheDiagnostic | null
+  /** 最近的前缀诊断记录（缓存差异视图数据源，最多保留 20 条） */
+  cacheDiagnostics: CacheDiagnostic[]
   rightPanel: 'browser' | 'terminal' | null
   /** 文件树面板请求输入框插入的 @引用（消费后清空） */
   pendingFileRef: string | null
@@ -64,6 +66,7 @@ interface AppState {
   clearStream: () => void
   setContextStatus: (status: ContextStatus | null) => void
   setCacheDiagnostic: (diagnostic: CacheDiagnostic | null) => void
+  appendCacheDiagnostic: (diagnostic: CacheDiagnostic) => void
   setRightPanel: (panel: AppState['rightPanel']) => void
   queueFileRef: (path: string) => void
   consumeFileRef: () => string | null
@@ -88,6 +91,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   streamingThinking: '',
   contextStatus: null,
   cacheDiagnostic: null,
+  cacheDiagnostics: [],
   rightPanel: null,
   pendingFileRef: null,
   setReady: (v) => set({ ready: v }),
@@ -114,6 +118,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearStream: () => set({ streamingText: '', streamingThinking: '' }),
   setContextStatus: (status) => set({ contextStatus: status }),
   setCacheDiagnostic: (diagnostic) => set({ cacheDiagnostic: diagnostic }),
+  appendCacheDiagnostic: (diagnostic) => set((state) => ({
+    cacheDiagnostic: diagnostic,
+    cacheDiagnostics: [diagnostic, ...state.cacheDiagnostics].slice(0, 20)
+  })),
   setRightPanel: (panel) => set({ rightPanel: panel }),
   queueFileRef: (path) => set({ pendingFileRef: path }),
   consumeFileRef: (): string | null => {

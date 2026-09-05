@@ -67,6 +67,8 @@ export interface CacheDiagnostic {
   missCategory?: 'avoidable' | 'ttl' | 'compaction'
   changedSections: string[]
   requestFingerprint: string
+  /** 记录时间（诊断视图排序用） */
+  createdAt: number
 }
 
 interface PendingCall {
@@ -353,7 +355,8 @@ export class AgentLoop {
       hitRate: usage.hitRate,
       missCategory,
       changedSections: prefix.changedSections,
-      requestFingerprint: prefix.fingerprint
+      requestFingerprint: prefix.fingerprint,
+      createdAt: now
     })
   }
 

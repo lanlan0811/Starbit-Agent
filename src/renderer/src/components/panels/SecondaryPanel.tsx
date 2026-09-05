@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, Brain, FolderOpen, KeyRound, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
-import type { AuditDto, McpServerConfigDto, McpServerStateDto, UsageSummaryDto } from '../../../../main/ipc/types'
+import type { AuditDto, McpServerConfigDto, McpServerStateDto, UsageReportDto } from '../../../../main/ipc/types'
 import type { PermissionRule } from '@core/permission/rules'
 import { useAppStore } from '../../stores/app'
 import { KnowledgePanel } from './KnowledgePanel'
@@ -263,17 +263,68 @@ function SettingsPanel(): JSX.Element {
 }
 
 function UsagePanel(): JSX.Element {
-  const [summary, setSummary] = useState<UsageSummaryDto | null>(null)
-  useEffect(() => { void window.starbit.usage.summary().then(setSummary) }, [])
+  const [summary, setSummary] = useState<UsageReportDto | null>(null)
+  const diagnostics = useAppStore((state) => state.cacheDiagnostics)
+  const currentSessionId = useAppStore((state) => state.currentSessionId)
+  const [scopeAll, setScopeAll] = useState(true)
+  useEffect(() => {
+    void window.starbit.usage.summary(scopeAll ? undefined : currentSessionId ?? undefined).then(setSummary)
+  }, [scopeAll, currentSessionId])
   if (!summary) return <EmptyText>正在读取用量…</EmptyText>
   const items = [
     ['总输入', summary.promptTokens], ['缓存命中', summary.cachedTokens], ['未命中', summary.uncachedTokens], ['输出', summary.outputTokens]
   ] as const
   return (
     <div className="panel-stack">
-      <div className="usage-rate"><strong>{(summary.hitRate * 100).toFixed(1)}%</strong><span>全局缓存命中率</span></div>
+      <div className="usage-rate"><strong>{(summary.hitRate * 100).toFixed(1)}%</strong><span>{scopeAll ? '全局' : '当前会话'}缓存命中率</span></div>
       <div className="usage-grid">{items.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value.toLocaleString()}</strong></div>)}</div>
       <p className="usage-misses">可避免 {summary.avoidableMisses} · TTL {summary.ttlMisses} · 压缩 {summary.compactionMisses}</p>
+      <div className="usage-scope-toggle">
+        <button className={`panel-button ${scopeAll ? 'is-active' : ''}`} onClick={() => setScopeAll(true)}>全局</button>
+        <button className={`panel-button ${!scopeAll ? 'is-active' : ''}`} disabled={!currentSessionId} onClick={() => setScopeAll(false)}>当前会话</button>
+      </div>
+      <section className="settings-group">
+        <h3>按模型费用估算</h3>
+        <div className="usage-cost-table">
+          {summary.byModel.map((row) => (
+            <article key={row.model}>
+              <strong>{row.model}</strong>
+              <span>输入 {row.promptTokens.toLocaleString()}（命中 {row.cachedTokens.toLocaleString()}）· 输出 {row.outputTokens.toLocaleString()} · {row.requests} 轮</span>
+              <em>{row.estimatedCost === null ? '未配置单价' : `¥${row.estimatedCost.toFixed(4)}`}</em>
+            </article>
+          ))}
+          {summary.byModel.length === 0 && <EmptyText>暂无主会话用量。</EmptyText>}
+        </div>
+        <p className="panel-message">
+          估算合计：¥{summary.totalEstimatedCost.toFixed(4)}
+          {summary.pricingConfigured ? '（按模型单价估算，非账单）' : '（部分模型未配置单价，合计偏低）'}
+        </p>
+      </section>
+      <section className="settings-group">
+        <h3>子代理用量</h3>
+        <p className="panel-message">
+          输入 {summary.subagent.promptTokens.toLocaleString()}（命中 {summary.subagent.cachedTokens.toLocaleString()}）· 输出 {summary.subagent.outputTokens.toLocaleString()} · {summary.subagent.requests} 轮 · 估算 ¥{summary.subagent.estimatedCost.toFixed(4)}
+        </p>
+        <p className="panel-message">子代理缓存单独路由，不计入全局命中率目标。</p>
+      </section>
+      <section className="settings-group">
+        <h3>前缀诊断</h3>
+        <div className="cache-diagnostic-list">
+          {diagnostics.map((diagnostic, index) => (
+            <article key={`${diagnostic.requestFingerprint}-${index}`} className={diagnostic.changedSections.length > 0 ? 'is-changed' : ''}>
+              <header>
+                <strong>{(diagnostic.hitRate * 100).toFixed(1)}%</strong>
+                <time>{new Date(diagnostic.createdAt).toLocaleTimeString()}</time>
+                {diagnostic.missCategory && <span>{diagnostic.missCategory === 'avoidable' ? '可避免 miss' : diagnostic.missCategory === 'ttl' ? 'TTL miss' : '压缩 miss'}</span>}
+              </header>
+              {diagnostic.changedSections.length > 0
+                ? <p>前缀变化：{diagnostic.changedSections.join('、')}</p>
+                : <p>前缀稳定（{diagnostic.requestFingerprint.slice(0, 12)}）</p>}
+            </article>
+          ))}
+          {diagnostics.length === 0 && <EmptyText>本轮会话暂无诊断记录；发送消息后逐轮生成。</EmptyText>}
+        </div>
+      </section>
     </div>
   )
 }

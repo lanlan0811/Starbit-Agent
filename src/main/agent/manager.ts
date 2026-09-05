@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import { loadDangerousRules } from '../security/dangerous-rules'
 import type { ContentPart, ErrorEvent, PermissionMode, SessionEvent, UsageEvent } from '@core/events'
-import { BUILTIN_MODELS, getModel, type ModelConfig, type ThinkingLevel } from '@core/models'
+import { BUILTIN_MODELS, getModel, type ModelConfig, type ModelPricing, type ThinkingLevel } from '@core/models'
 import { nanoid } from '@core/nanoid'
 import { PermissionService } from '@core/permission'
 import { BUILTIN_DANGEROUS_RULES } from '@core/permission/dangerous-rules'
@@ -12,7 +12,7 @@ import { OpenAiCompatibleProvider } from '../provider/openai-provider'
 import { PromptAssembler, assemblePromptTemplate } from '../prompts/assembler'
 import { redact } from '../security/redact'
 import { SettingsService } from '../security/settings'
-import { getUsageSummary, listAudit, listWhitelist, recordUsage, upsertWhitelist, writeAudit } from '../session/database'
+import { getUsageByModel, getUsageSummary, listAudit, listWhitelist, recordUsage, upsertWhitelist, writeAudit } from '../session/database'
 import { SessionManager } from '../session/manager'
 import { createBuiltinToolRegistry, type ShellSettings } from '../tools/builtin'
 import { SkillManager } from '../skills/manager'
@@ -35,6 +35,7 @@ import type { CacheDiagnostic, CompactionConfirmationRequest } from './loop'
 import { registerTodoTools } from '../tools/todo'
 import { registerSandboxTools } from '../tools/sandbox'
 import { registerTaskTools, type SubagentRequest, type SubagentResult } from '../tools/task'
+import { estimateCost, sumCost } from './usage-cost'
 import type { ToolContext } from '@core/tools/types'
 
 export interface PermissionPromptDto {
@@ -47,6 +48,33 @@ export interface PermissionPromptDto {
   command?: string
   impact: string
   mode: PermissionMode
+}
+
+/** 按模型聚合的用量与估算费用 */
+export interface UsageModelCostDto {
+  model: string
+  promptTokens: number
+  cachedTokens: number
+  outputTokens: number
+  requests: number
+  /** 估算费用（¥）；模型未配置单价时为 null */
+  estimatedCost: number | null
+}
+
+/** 用量统计报表（主会话口径 + 子代理独立统计） */
+export interface UsageReportDto {
+  promptTokens: number
+  cachedTokens: number
+  uncachedTokens: number
+  outputTokens: number
+  hitRate: number
+  avoidableMisses: number
+  ttlMisses: number
+  compactionMisses: number
+  byModel: UsageModelCostDto[]
+  totalEstimatedCost: number
+  pricingConfigured: boolean
+  subagent: { promptTokens: number; cachedTokens: number; outputTokens: number; requests: number; estimatedCost: number }
 }
 
 interface PendingPermission {
@@ -240,8 +268,28 @@ export class AgentManager {
     return true
   }
 
-  usageSummary(sessionId?: string): ReturnType<typeof getUsageSummary> {
-    return getUsageSummary(sessionId)
+  usageSummary(sessionId?: string): UsageReportDto {
+    const summary = getUsageSummary(sessionId)
+    const models = this.listModels()
+    const priceOf = (id: string): ModelPricing | undefined => models.find((model) => model.id === id)?.pricing
+    const buildRows = (isSubagent: boolean): UsageModelCostDto[] =>
+      getUsageByModel(isSubagent, sessionId).map((row) => ({ ...row, estimatedCost: estimateCost(row, priceOf(row.model)) }))
+    const byModel = buildRows(false)
+    const subagentRows = buildRows(true)
+    const subagent = {
+      promptTokens: subagentRows.reduce((total, row) => total + row.promptTokens, 0),
+      cachedTokens: subagentRows.reduce((total, row) => total + row.cachedTokens, 0),
+      outputTokens: subagentRows.reduce((total, row) => total + row.outputTokens, 0),
+      requests: subagentRows.reduce((total, row) => total + row.requests, 0),
+      estimatedCost: sumCost(subagentRows)
+    }
+    return {
+      ...summary,
+      byModel,
+      totalEstimatedCost: sumCost(byModel),
+      pricingConfigured: byModel.length > 0 && byModel.every((row) => row.estimatedCost !== null),
+      subagent
+    }
   }
 
   audit(limit?: number, sessionId?: string): ReturnType<typeof listAudit> {

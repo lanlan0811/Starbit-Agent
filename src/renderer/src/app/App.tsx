@@ -55,7 +55,7 @@ export default function App(): JSX.Element {
       } else if (ev.type === 'context/status' && ev.sessionId === state.currentSessionId) {
         state.setContextStatus(ev.status)
       } else if (ev.type === 'cache/diagnostic' && ev.sessionId === state.currentSessionId) {
-        state.setCacheDiagnostic(ev.diagnostic)
+        state.appendCacheDiagnostic(ev.diagnostic)
       } else if (ev.type === 'session/created') {
         state.setSessions([ev.session, ...state.sessions])
       }

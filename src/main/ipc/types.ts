@@ -8,7 +8,7 @@ import type { RuleScope, PermissionRule } from '@core/permission/rules'
 import type { PermissionPromptDto } from '../agent/manager'
 import type { BrowserBounds, BrowserControlMode, BrowserDownloadState, BrowserState, BrowserTabState } from '../browser/types'
 import type { KnowledgeBaseRecord, KnowledgeDocumentRecord, KnowledgeSearchHit } from '../knowledge/types'
-import type { KnowledgeSettings } from '../agent/manager'
+import type { KnowledgeSettings, UsageModelCostDto, UsageReportDto } from '../agent/manager'
 import type { MemoryEntry, MemoryScope, MemorySearchHit } from '../memory/types'
 import type { CacheDiagnostic } from '../agent/loop'
 import type { ContextStatus } from '../agent/context'
@@ -59,7 +59,7 @@ export interface IpcApi {
     setSettings(patch: { planDocPattern?: string | null }): Promise<void>
   }
   usage: {
-    summary(sessionId?: string): Promise<UsageSummaryDto>
+    summary(sessionId?: string): Promise<UsageReportDto>
   }
   audit: {
     list(limit?: number, sessionId?: string): Promise<AuditDto[]>
@@ -134,6 +134,8 @@ export interface UsageSummaryDto {
   ttlMisses: number
   compactionMisses: number
 }
+
+export type { UsageModelCostDto, UsageReportDto }
 
 export interface AuditDto {
   id: string

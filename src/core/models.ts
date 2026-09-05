@@ -31,6 +31,16 @@ export interface ThinkingMapping {
 /** API 形态 */
 export type ApiShape = 'chat-completions' | 'responses'
 
+/** 按厂商标价估算费用（每百万 tokens，人民币估算值，用户可在模型编辑器中覆盖） */
+export interface ModelPricing {
+  /** 普通输入（未命中缓存） */
+  inputPerMillion: number
+  /** 缓存命中输入 */
+  cachedInputPerMillion: number
+  /** 输出 */
+  outputPerMillion: number
+}
+
 export interface ModelConfig {
   id: string
   name: string
@@ -67,6 +77,8 @@ export interface ModelConfig {
     keep?: boolean
     preserveThinking?: boolean
   }
+  /** 费用估算单价（¥/百万 tokens）；自定义模型可留空则不计费 */
+  pricing?: ModelPricing
 }
 
 /**
@@ -131,7 +143,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: ['temperature', 'top_p', 'max_tokens', 'stream'],
     usageCachedTokensPath: 'prompt_cache_hit_tokens',
     usageCacheScope: 'top',
-    reasoning: { clearThinking: false }
+    reasoning: { clearThinking: false },
+    pricing: { inputPerMillion: 4, cachedInputPerMillion: 0.8, outputPerMillion: 16 }
   },
   {
     id: 'deepseek-v4-flash',
@@ -149,7 +162,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: ['temperature', 'top_p', 'max_tokens', 'stream'],
     usageCachedTokensPath: 'prompt_cache_hit_tokens',
     usageCacheScope: 'top',
-    reasoning: { clearThinking: false }
+    reasoning: { clearThinking: false },
+    pricing: { inputPerMillion: 1, cachedInputPerMillion: 0.2, outputPerMillion: 4 }
   },
   {
     id: 'deepseek-v4-flash-vision-exp',
@@ -167,7 +181,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: ['temperature', 'top_p', 'max_tokens', 'stream'],
     usageCachedTokensPath: 'prompt_cache_hit_tokens',
     usageCacheScope: 'top',
-    reasoning: { clearThinking: false }
+    reasoning: { clearThinking: false },
+    pricing: { inputPerMillion: 2, cachedInputPerMillion: 0.4, outputPerMillion: 8 }
   },
   {
     id: 'glm-5.2',
@@ -185,7 +200,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'nested',
-    reasoning: { clearThinking: false }
+    reasoning: { clearThinking: false },
+    pricing: { inputPerMillion: 4, cachedInputPerMillion: 0.8, outputPerMillion: 12 }
   },
   {
     id: 'glm-5.3',
@@ -203,7 +219,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'nested',
-    reasoning: { clearThinking: false }
+    reasoning: { clearThinking: false },
+    pricing: { inputPerMillion: 8, cachedInputPerMillion: 1.6, outputPerMillion: 24 }
   },
   {
     id: 'glm-5.3-flash',
@@ -221,7 +238,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'nested',
-    reasoning: { clearThinking: false }
+    reasoning: { clearThinking: false },
+    pricing: { inputPerMillion: 1, cachedInputPerMillion: 0.2, outputPerMillion: 4 }
   },
   {
     id: 'qwen3.7-plus',
@@ -239,7 +257,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'nested',
-    reasoning: { preserveThinking: true }
+    reasoning: { preserveThinking: true },
+    pricing: { inputPerMillion: 2, cachedInputPerMillion: 0.4, outputPerMillion: 8 }
   },
   {
     id: 'qwen3.8-max',
@@ -257,7 +276,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'nested',
-    reasoning: { preserveThinking: true }
+    reasoning: { preserveThinking: true },
+    pricing: { inputPerMillion: 6, cachedInputPerMillion: 1.2, outputPerMillion: 24 }
   },
   {
     id: 'kimi-k3',
@@ -275,7 +295,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: ['max_tokens'],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'top',
-    reasoning: { keep: true }
+    reasoning: { keep: true },
+    pricing: { inputPerMillion: 6, cachedInputPerMillion: 1.2, outputPerMillion: 24 }
   },
   {
     id: 'kimi-k2.7-code',
@@ -293,7 +314,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'top',
-    reasoning: { keep: true }
+    reasoning: { keep: true },
+    pricing: { inputPerMillion: 8, cachedInputPerMillion: 1.6, outputPerMillion: 32 }
   },
   {
     id: 'MiniMax-M3',
@@ -311,7 +333,8 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     samplingWhitelist: [],
     usageCachedTokensPath: 'cached_tokens',
     usageCacheScope: 'nested',
-    reasoning: {}
+    reasoning: {},
+    pricing: { inputPerMillion: 2, cachedInputPerMillion: 0.4, outputPerMillion: 8 }
   }
 ]
 
