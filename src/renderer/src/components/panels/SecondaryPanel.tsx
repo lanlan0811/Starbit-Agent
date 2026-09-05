@@ -74,6 +74,10 @@ function SettingsPanel(): JSX.Element {
   const [shellExecutable, setShellExecutable] = useState('')
   const [shellArgs, setShellArgs] = useState('')
   const [rules, setRules] = useState<PermissionRule[]>([])
+  const [ruleLabel, setRuleLabel] = useState('Bash')
+  const [rulePattern, setRulePattern] = useState('')
+  const [ruleAction, setRuleAction] = useState<'allow' | 'deny' | 'ask'>('allow')
+  const [planDocPattern, setPlanDocPattern] = useState('')
   const [embeddingMode, setEmbeddingMode] = useState<'local' | 'auto' | 'remote'>('local')
   const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState('')
   const [embeddingModel, setEmbeddingModel] = useState('')
@@ -89,13 +93,15 @@ function SettingsPanel(): JSX.Element {
       window.starbit.models.configured(),
       window.starbit.settings.getShell(),
       window.starbit.permission.listRules(),
+      window.starbit.permission.getSettings(),
       window.starbit.knowledge.getSettings(),
       currentSessionId ? window.starbit.browser.getState(currentSessionId) : Promise.resolve(null)
-    ]).then(([keys, shell, nextRules, embedding, browserState]) => {
+    ]).then(([keys, shell, nextRules, permission, embedding, browserState]) => {
       setConfigured(keys)
       setShellExecutable(shell.executable)
       setShellArgs(shell.args.join(' '))
       setRules(nextRules)
+      setPlanDocPattern(permission.planDocPattern ?? '')
       setEmbeddingMode(embedding.mode)
       setEmbeddingBaseUrl(embedding.baseUrl)
       setEmbeddingModel(embedding.model)
@@ -142,6 +148,26 @@ function SettingsPanel(): JSX.Element {
     setMessage('权限规则已删除。')
   }
 
+  const addRule = async (): Promise<void> => {
+    try {
+      await window.starbit.permission.addRule({ semanticLabel: ruleLabel, pattern: rulePattern, action: ruleAction })
+      setRules(await window.starbit.permission.listRules())
+      setRulePattern('')
+      setMessage('权限规则已添加，立即生效。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const savePlanDocPattern = async (): Promise<void> => {
+    try {
+      await window.starbit.permission.setSettings({ planDocPattern: planDocPattern.trim() || null })
+      setMessage('计划文档规则已保存并应用到现有会话。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   const updateBrowserSetting = async (kind: 'reuse' | 'private', value: boolean): Promise<void> => {
     if (!currentSessionId) return
     const state = kind === 'reuse'
@@ -182,6 +208,22 @@ function SettingsPanel(): JSX.Element {
           {rules.map((rule) => <article key={rule.id}><div><strong>{rule.semanticLabel}({rule.pattern})</strong><span>{rule.action} · {rule.scope} · 命中 {rule.hitCount ?? 0} 次</span></div><button title="删除规则" onClick={() => void deleteRule(rule.id)}><Trash2 size={13} /></button></article>)}
           {rules.length === 0 && <EmptyText>尚无持久化权限规则。</EmptyText>}
         </div>
+        <div className="settings-rule-editor">
+          <label>工具语义标签</label>
+          <input value={ruleLabel} onChange={(event) => setRuleLabel(event.target.value)} placeholder="Bash / Write / Edit" />
+          <label>匹配规则（支持 * 通配）</label>
+          <input value={rulePattern} onChange={(event) => setRulePattern(event.target.value)} placeholder="npm run * 或 ./docs/**" />
+          <label>动作</label>
+          <select value={ruleAction} onChange={(event) => setRuleAction(event.target.value as typeof ruleAction)}>
+            <option value="allow">允许</option>
+            <option value="ask">每次询问</option>
+            <option value="deny">拒绝</option>
+          </select>
+          <button className="panel-button" onClick={() => void addRule()}><Plus size={14} /> 添加规则</button>
+        </div>
+        <label>计划文档规则（计划模式下放行的 Markdown，正则；留空恢复内置默认）</label>
+        <input value={planDocPattern} onChange={(event) => setPlanDocPattern(event.target.value)} placeholder="内置默认：文件名含 计划/plan 的 *.md" />
+        <button className="panel-button" onClick={() => void savePlanDocPattern()}><Save size={14} /> 保存计划文档规则</button>
       </section>
       <section className="settings-group">
         <h3><BookOpen size={15} /> 知识库 Embedding</h3>

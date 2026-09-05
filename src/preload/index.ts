@@ -28,7 +28,10 @@ const api: IpcApi = {
   permission: {
     respond: (requestId, outcome, scope, reason) => ipcRenderer.invoke('permission:respond', requestId, outcome, scope, reason),
     listRules: () => ipcRenderer.invoke('permission:listRules'),
-    deleteRule: (id) => ipcRenderer.invoke('permission:deleteRule', id)
+    deleteRule: (id) => ipcRenderer.invoke('permission:deleteRule', id),
+    addRule: (input) => ipcRenderer.invoke('permission:addRule', input),
+    getSettings: () => ipcRenderer.invoke('permission:getSettings'),
+    setSettings: (patch) => ipcRenderer.invoke('permission:setSettings', patch)
   },
   usage: {
     summary: (sessionId) => ipcRenderer.invoke('usage:summary', sessionId)

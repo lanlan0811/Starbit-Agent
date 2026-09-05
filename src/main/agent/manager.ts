@@ -6,7 +6,7 @@ import { BUILTIN_MODELS, getModel, type ModelConfig, type ThinkingLevel } from '
 import { nanoid } from '@core/nanoid'
 import { PermissionService } from '@core/permission'
 import { BUILTIN_DANGEROUS_RULES } from '@core/permission/dangerous-rules'
-import type { RuleScope } from '@core/permission/rules'
+import type { PermissionRule, RuleScope } from '@core/permission/rules'
 import { AgentLoop, type PermissionConfirmationRequest, type PermissionResponse } from './loop'
 import { OpenAiCompatibleProvider } from '../provider/openai-provider'
 import { PromptAssembler, assemblePromptTemplate } from '../prompts/assembler'
@@ -306,6 +306,44 @@ export class AgentManager {
     writeAudit('shell-settings-updated', JSON.stringify(redact(shell)))
   }
 
+  /** 读取权限相关设置（计划文档规则等）。 */
+  getPermissionSettings(): { planDocPattern: string | null } {
+    return { planDocPattern: this.settings.getString('permission:planDocPattern', '') || null }
+  }
+
+  /** 更新权限设置并即时应用到已存在的会话运行时。 */
+  setPermissionSettings(patch: { planDocPattern?: string | null }): void {
+    if ('planDocPattern' in patch) {
+      const source = patch.planDocPattern?.trim() ?? ''
+      if (source) new RegExp(source, 'i')
+      this.settings.setString('permission:planDocPattern', source)
+      const pattern = source || null
+      for (const pending of this.sessionRuntimes.values()) {
+        void pending.then((runtime) => runtime.permissions.setPlanDocPattern(pattern)).catch(() => undefined)
+      }
+      writeAudit('permission-settings-updated', JSON.stringify({ planDocPattern: source || null }))
+    }
+  }
+
+  /** 新增一条永久白名单规则（设置面板编辑入口）。 */
+  addPermissionRule(input: { semanticLabel: string; pattern: string; action: 'allow' | 'deny' | 'ask' }): PermissionRule {
+    const semanticLabel = input.semanticLabel.trim()
+    const pattern = input.pattern.trim()
+    if (!semanticLabel) throw new Error('工具语义标签不能为空')
+    if (!pattern) throw new Error('匹配规则不能为空')
+    const rule: PermissionRule = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      semanticLabel,
+      pattern,
+      action: input.action,
+      scope: 'permanent',
+      createdAt: Date.now()
+    }
+    upsertWhitelist(rule)
+    writeAudit('permission-rule-added', JSON.stringify(redact(rule)))
+    return rule
+  }
+
   async listSkills(workspacePath: string): Promise<ReturnType<SkillManager['list']>> {
     const manager = new SkillManager({ workspacePath })
     await manager.scan()
@@ -528,6 +566,7 @@ export class AgentManager {
     const permissions = new PermissionService(await this.loadPermissionRules())
     permissions.setMode(session.mode)
     permissions.setRules(listWhitelist())
+    permissions.setPlanDocPattern(this.getPermissionSettings().planDocPattern)
     const memoryContext = await memory.loadContext()
     const assembled = await new PromptAssembler({
       workspacePath: session.workspacePath,
@@ -592,6 +631,7 @@ export class AgentManager {
     const permissions = new PermissionService(await this.loadPermissionRules())
     permissions.setMode(request.type === 'explore' ? 'plan' : parentContext.mode as PermissionMode)
     permissions.setRules(listWhitelist())
+    permissions.setPlanDocPattern(this.getPermissionSettings().planDocPattern)
     const apiKey = this.settings.getSecret(`model:${model.id}:apiKey`) || process.env.STARBIT_API_KEY || ''
     if (!apiKey && model.apiKeyRequired !== false) throw new Error(`模型 ${model.id} 尚未配置 API Key`)
     const systemPrompt = await assemblePromptTemplate('subagent.md', {

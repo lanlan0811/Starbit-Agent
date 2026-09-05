@@ -54,6 +54,9 @@ export interface IpcApi {
     respond(requestId: string, outcome: 'allow' | 'deny', scope: RuleScope, reason?: string): Promise<boolean>
     listRules(): Promise<PermissionRule[]>
     deleteRule(id: string): Promise<void>
+    addRule(input: { semanticLabel: string; pattern: string; action: 'allow' | 'deny' | 'ask' }): Promise<PermissionRule>
+    getSettings(): Promise<{ planDocPattern: string | null }>
+    setSettings(patch: { planDocPattern?: string | null }): Promise<void>
   }
   usage: {
     summary(sessionId?: string): Promise<UsageSummaryDto>

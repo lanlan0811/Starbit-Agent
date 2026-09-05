@@ -92,6 +92,9 @@
 .memory-list header { display: flex; justify-content: space-between; gap: var(--space-2); }
 .memory-list p,
 .search-results p { max-height: 160px; margin: 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-text-secondary); font-size: var(--font-size-caption); }
+.settings-rule-editor { display: grid; gap: var(--space-1); padding: var(--space-2); border: 1px dashed var(--color-border); border-radius: var(--radius-card); }
+.settings-rule-editor input,
+.settings-rule-editor select { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-input); background: var(--color-bg-surface); color: var(--color-text-primary); font: inherit; }
 
 /* 文件树面板 */
 .files-panel { align-content: start; }

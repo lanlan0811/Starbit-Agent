@@ -63,4 +63,21 @@ describe('PermissionService', () => {
     service.recordDecision(request, 'allow', 'session')
     expect(service.decide(request).verdict).toBe('allow')
   })
+
+  it('计划文档规则可自定义、可恢复默认，非法正则抛错', () => {
+    const service = new PermissionService(BUILTIN_DANGEROUS_RULES)
+    expect(service.isPlanDoc('docs/实施计划.md')).toBe(true)
+    expect(service.isPlanDoc('notes.md')).toBe(false)
+    service.setPlanDocPattern('^notes.*\\.md$')
+    expect(service.isPlanDoc('notes/2026.md')).toBe(true)
+    expect(service.isPlanDoc('docs/计划.md')).toBe(false)
+    expect(service.getPlanDocPattern()).toBe('^notes.*\\.md$')
+    service.setPlanDocPattern(null)
+    expect(service.getPlanDocPattern()).toBeNull()
+    expect(service.isPlanDoc('plan.md')).toBe(true)
+    expect(() => service.setPlanDocPattern('([invalid')).toThrow('正则表达式')
+    // 自定义规则参与计划模式放行判定
+    service.setPlanDocPattern('^notes.*\\.md$')
+    expect(service.decide({ tool: tool('write', 'Write'), semanticLabel: 'Write', subject: 'notes/2026.md', mode: 'plan' }).verdict).toBe('allow')
+  })
 })

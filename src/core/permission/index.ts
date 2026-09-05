@@ -40,6 +40,8 @@ export class PermissionService {
   /** 本会话已批准的一次性/会话级记录 */
   private sessionApprovals = new Set<string>()
   private dangerousRules: DangerousRule[] = []
+  /** 用户自定义计划文档规则（null = 使用内置默认） */
+  private planDocPattern: RegExp | null = null
 
   constructor(dangerousRules: DangerousRule[] = []) {
     this.dangerousRules = dangerousRules
@@ -67,9 +69,20 @@ export class PermissionService {
     this.dangerousRules = rules
   }
 
+  /** 设置自定义计划文档判定规则；传 null/空串恢复内置默认。非法正则抛错。 */
+  setPlanDocPattern(pattern: string | null): void {
+    const source = pattern?.trim() ?? ''
+    this.planDocPattern = source ? compilePattern(source) : null
+  }
+
+  /** 当前生效的计划文档规则来源（null 表示内置默认）。 */
+  getPlanDocPattern(): string | null {
+    return this.planDocPattern?.source ?? null
+  }
+
   /** 计划文档判定（§PlanDocPattern）—— 命中 `***.md` 约定放行 */
-  isPlanDoc(path: string, pattern: RegExp = /(?:^|[\\/])[^\\/]*?(计划|plan)[^\\/]*\.md$/i): boolean {
-    return pattern.test(path)
+  isPlanDoc(path: string): boolean {
+    return (this.planDocPattern ?? DEFAULT_PLAN_DOC_PATTERN).test(path)
   }
 
   /**
@@ -191,6 +204,17 @@ export class PermissionService {
 
 function rulePriority(action: RuleAction): number {
   return action === 'deny' ? 0 : action === 'ask' ? 1 : 2
+}
+
+/** 内置默认计划文档规则：文件名含“计划/plan”的 Markdown。 */
+export const DEFAULT_PLAN_DOC_PATTERN = /(?:^|[\\/])[^\\/]*?(计划|plan)[^\\/]*\.md$/i
+
+function compilePattern(source: string): RegExp {
+  try {
+    return new RegExp(source, 'i')
+  } catch {
+    throw new Error(`计划文档规则不是有效的正则表达式: ${source}`)
+  }
 }
 
 function ruleMatchesBySubject(rule: PermissionRule, subject: string): boolean {

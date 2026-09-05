@@ -70,6 +70,11 @@ export function registerIpcHandlers(): void {
   )
   ipcMain.handle('permission:listRules', () => listWhitelist())
   ipcMain.handle('permission:deleteRule', (_e, id: string) => deleteWhitelist(id))
+  ipcMain.handle('permission:addRule', (_e, input: { semanticLabel: string; pattern: string; action: 'allow' | 'deny' | 'ask' }) =>
+    agents.addPermissionRule(input)
+  )
+  ipcMain.handle('permission:getSettings', () => agents.getPermissionSettings())
+  ipcMain.handle('permission:setSettings', (_e, patch: { planDocPattern?: string | null }) => agents.setPermissionSettings(patch))
 
   // Usage, audit and settings
   ipcMain.handle('usage:summary', (_e, sessionId?: string) => agents.usageSummary(sessionId))
