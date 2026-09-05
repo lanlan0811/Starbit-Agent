@@ -2,22 +2,25 @@
 
 衔星是一款 Windows 优先的桌面端通用 AI Agent 工作台。项目采用 Electron、React 与 TypeScript，自研 Agent Loop，并通过 OpenAI 兼容协议接入模型。
 
-> 当前状态：开发版本（0.1.0）。已接通 Agent 工具循环、自定义模型、终端、浏览器、知识库和记忆；上下文压缩与协作工具正在进行完整验收。发布、缓存目标和厂商多模态兼容仍有未完成项，详见[验收状态](docs/zh-CN/acceptance-status.md)。
+> 当前状态：开发版本（0.1.0）。已实现开发计划 M1–M4 的全部功能模块：Agent 工具循环、三级权限、终端、浏览器、知识库（better-sqlite3 + sqlite-vec）、双层记忆、上下文压缩、子代理、多模态与缓存门禁。厂商实测、安装包发布与真实缓存命中率等验收证据仍在补充，详见[验收状态](docs/zh-CN/acceptance-status.md)。
 
 ## 已实现
 
 - Electron 主进程、隔离的 preload 与 React Renderer 工程骨架
-- SQLite 本地会话与 append-only 事件日志
+- SQLite 本地会话与 append-only 事件日志（better-sqlite3，原生模块不可用时回退 sql.js）
 - 三级权限判定核心和危险命令规则
 - Markdown、GFM、KaTeX 与代码高亮渲染
 - 11 个内置模型的能力、思考档位和缓存字段配置
 - Chat Completions / Responses 双形态流式 Provider
-- 图片与视频内容单元转换、本地媒体 data URL 编码
+- 图片与视频内容单元转换、本地媒体 data URL 编码、ffmpeg 抽帧降级与截图回传视觉模型
 - usage 缓存字段归一化、稳定前缀规范化与 SHA-256 自检
-- Vitest 单元测试和 Playwright Electron 启动测试
+- Vitest 单元测试（含缓存回归门禁与 MCP stdio 集成测试）和 Playwright Electron E2E
 - 自定义模型端点、上下文/输出上限和三档思考参数配置
 - MCP、Claude Skills、交互终端、可视浏览器、知识库与双层记忆
-- 可取消的上下文压缩、Task 子代理、TodoWrite 计划同步、Node/Python 脚本执行
+- 可取消的上下文压缩（独立摘要模型 + 分批预算）、Task 并行子代理、TodoWrite 计划同步、Node/Python 脚本执行
+- 工作区文件树、@文件引用、附件粘贴拖放、Edit/Write 完整 diff 展示
+- 权限白名单与计划文档规则可视化管理、按模型费用估算、前缀差异诊断
+- 会话与全量数据导出导入、zh-CN/en-US 界面切换、自动更新与本地错误报告
 
 ## 开发环境
 
