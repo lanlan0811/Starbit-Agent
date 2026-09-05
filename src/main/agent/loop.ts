@@ -9,7 +9,7 @@ import type { ToolResult } from '@core/tools/types'
 import type { JsonValue } from '@core/types'
 import { PrefixFingerprintTracker } from '../provider/canonical'
 import type { NormalizedUsage, PrefixComparison, ProviderMessage, ProviderRequest, ProviderStreamEvent, ProviderTool } from '../provider/types'
-import { ContextManager, type CompactionLevel, type CompactionReason, type ContextStatus } from './context'
+import { ContextManager, estimateMessageTokens, type CompactionLevel, type CompactionReason, type ContextStatus } from './context'
 import { assemblePromptTemplate } from '../prompts/assembler'
 
 const MAX_TOOL_ROUNDS = 16
@@ -429,24 +429,38 @@ export class AgentLoop {
 
   private async summarize(messages: ProviderMessage[]): Promise<string> {
     if (messages.length === 0) return '没有需要归纳的早期历史。'
+    const model = this.options.compactionModel ?? this.options.model
+    const apiKey = this.options.compactionApiKey ?? this.options.apiKey
+    // 长历史分批预算：每批不超过摘要模型窗口的一半（留出系统提示与输出空间）
+    const batchBudgetTokens = Math.max(2_048, Math.floor(model.contextWindow * 0.5))
+    const batches = splitSummaryBatches(messages, batchBudgetTokens)
+    let accumulated = ''
+    for (const batch of batches) {
+      accumulated = await this.summarizeBatch(batch, accumulated, model, apiKey)
+    }
+    return accumulated
+  }
+
+  private async summarizeBatch(batch: ProviderMessage[], previousSummary: string, model: ModelConfig, apiKey: string): Promise<string> {
     const summaryMessages: ProviderMessage[] = [
       {
         role: 'system',
         content: await assemblePromptTemplate('compaction.md', {})
-      },
-      { role: 'user', content: serializeForSummary(messages) }
+      }
     ]
+    if (previousSummary) summaryMessages.push({ role: 'system', content: `前一批次摘要（请在新摘要中保留仍然有效的结论）：\n${previousSummary}` })
+    summaryMessages.push({ role: 'user', content: serializeForSummary(batch) })
     let summary = ''
     const tools: ProviderTool[] = []
     const prefix = new PrefixFingerprintTracker().compare({ system: summaryMessages[0].content as string, tools: [], skills: [] })
     for await (const event of this.options.provider.stream({
-      model: this.options.compactionModel ?? this.options.model,
-      apiKey: this.options.compactionApiKey ?? this.options.apiKey,
+      model,
+      apiKey,
       messages: summaryMessages,
       tools,
       thinkingLevel: 'low',
       sampling: { temperature: 0 },
-      maxOutputTokens: Math.min(4_096, this.options.model.maxOutputTokens),
+      maxOutputTokens: Math.min(4_096, model.maxOutputTokens),
       promptCacheKey: `${this.options.sessionId}:compact`,
       signal: this.controller?.signal
     })) {
@@ -566,6 +580,25 @@ function classifyMiss(
   if (context.prefixChanged) return 'avoidable'
   if (context.elapsedMs >= 5 * 60_000) return 'ttl'
   return context.elapsedMs > 0 ? 'avoidable' : undefined
+}
+
+/** 按估算 token 预算切分待摘要消息；单条超预算时独立成批，保证每批非空。 */
+export function splitSummaryBatches(messages: ProviderMessage[], budgetTokens: number): ProviderMessage[][] {
+  const batches: ProviderMessage[][] = []
+  let current: ProviderMessage[] = []
+  let currentTokens = 0
+  for (const message of messages) {
+    const tokens = estimateMessageTokens(message)
+    if (current.length > 0 && currentTokens + tokens > budgetTokens) {
+      batches.push(current)
+      current = []
+      currentTokens = 0
+    }
+    current.push(message)
+    currentTokens += tokens
+  }
+  if (current.length > 0) batches.push(current)
+  return batches
 }
 
 function serializeForSummary(messages: ProviderMessage[]): string {

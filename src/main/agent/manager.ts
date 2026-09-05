@@ -186,6 +186,8 @@ export class AgentManager {
         provider: this.provider,
         initialEvents: this.sessions.replay(sessionId),
         prefixTracker: this.getPrefixTracker(sessionId),
+        compactionModel: this.resolveCompactionModel(model),
+        compactionApiKey: this.resolveCompactionApiKey(),
         onEvent: (event) => this.recordEvent(event),
         onDelta: (delta) => this.push({ type: 'agent/delta', sessionId, ...delta }),
         onContextStatus: (status) => this.push({ type: 'context/status', sessionId, status }),
@@ -352,6 +354,31 @@ export class AgentManager {
     if (!shell.executable.trim() || !Array.isArray(shell.args)) throw new Error('Shell 配置无效')
     this.settings.setJson('shell', { executable: shell.executable.trim(), args: shell.args })
     writeAudit('shell-settings-updated', JSON.stringify(redact(shell)))
+  }
+
+  /** 压缩摘要独立小模型（未配置时回退主模型）。 */
+  getCompactionSettings(): { modelId: string | null } {
+    return { modelId: this.settings.getString('compaction:modelId', '') || null }
+  }
+
+  setCompactionSettings(patch: { modelId?: string | null }): void {
+    if (!('modelId' in patch)) return
+    const modelId = patch.modelId?.trim() ?? ''
+    if (modelId) this.resolveModel(modelId)
+    this.settings.setString('compaction:modelId', modelId)
+    writeAudit('compaction-settings-updated', JSON.stringify({ modelId: modelId || null }))
+  }
+
+  private resolveCompactionModel(fallback: ModelConfig): ModelConfig {
+    const modelId = this.settings.getString('compaction:modelId', '')
+    if (!modelId) return fallback
+    return this.listModels().find((model) => model.id === modelId) ?? fallback
+  }
+
+  private resolveCompactionApiKey(): string | undefined {
+    const modelId = this.settings.getString('compaction:modelId', '')
+    if (!modelId) return undefined
+    return this.settings.getSecret(`model:${modelId}:apiKey`) || undefined
   }
 
   /** 读取权限相关设置（计划文档规则等）。 */

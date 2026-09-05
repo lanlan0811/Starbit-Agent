@@ -73,6 +73,7 @@ function SettingsPanel(): JSX.Element {
   const [configured, setConfigured] = useState<Record<string, boolean>>({})
   const [shellExecutable, setShellExecutable] = useState('')
   const [shellArgs, setShellArgs] = useState('')
+  const [compactionModelId, setCompactionModelId] = useState('')
   const [rules, setRules] = useState<PermissionRule[]>([])
   const [ruleLabel, setRuleLabel] = useState('Bash')
   const [rulePattern, setRulePattern] = useState('')
@@ -94,14 +95,16 @@ function SettingsPanel(): JSX.Element {
       window.starbit.settings.getShell(),
       window.starbit.permission.listRules(),
       window.starbit.permission.getSettings(),
+      window.starbit.settings.getCompaction(),
       window.starbit.knowledge.getSettings(),
       currentSessionId ? window.starbit.browser.getState(currentSessionId) : Promise.resolve(null)
-    ]).then(([keys, shell, nextRules, permission, embedding, browserState]) => {
+    ]).then(([keys, shell, nextRules, permission, compaction, embedding, browserState]) => {
       setConfigured(keys)
       setShellExecutable(shell.executable)
       setShellArgs(shell.args.join(' '))
       setRules(nextRules)
       setPlanDocPattern(permission.planDocPattern ?? '')
+      setCompactionModelId(compaction.modelId ?? '')
       setEmbeddingMode(embedding.mode)
       setEmbeddingBaseUrl(embedding.baseUrl)
       setEmbeddingModel(embedding.model)
@@ -128,6 +131,15 @@ function SettingsPanel(): JSX.Element {
   const saveShell = async (): Promise<void> => {
     await window.starbit.settings.setShell({ executable: shellExecutable, args: splitArgs(shellArgs) })
     setMessage('Shell 配置已保存。')
+  }
+
+  const saveCompaction = async (): Promise<void> => {
+    try {
+      await window.starbit.settings.setCompaction({ modelId: compactionModelId || null })
+      setMessage('压缩摘要模型已保存；下次压缩时生效。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
   }
 
   const saveEmbedding = async (): Promise<void> => {
@@ -200,6 +212,15 @@ function SettingsPanel(): JSX.Element {
         <label>启动参数</label>
         <input value={shellArgs} onChange={(event) => setShellArgs(event.target.value)} />
         <button className="panel-button" onClick={() => void saveShell()}><Save size={14} /> 保存 Shell</button>
+      </section>
+      <section className="settings-group">
+        <h3>上下文压缩</h3>
+        <label>摘要模型（留空使用当前主模型；建议选择低成本模型）</label>
+        <select value={compactionModelId} onChange={(event) => setCompactionModelId(event.target.value)}>
+          <option value="">跟随主模型</option>
+          {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+        </select>
+        <button className="panel-button" onClick={() => void saveCompaction()}><Save size={14} /> 保存压缩设置</button>
       </section>
       <ModelEditor />
       <section className="settings-group">
