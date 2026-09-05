@@ -106,6 +106,9 @@ const api: IpcApi = {
   data: {
     export: () => ipcRenderer.invoke('data:export'),
     import: () => ipcRenderer.invoke('data:import')
+  },
+  errors: {
+    list: () => ipcRenderer.invoke('errors:list')
   }
 }
 

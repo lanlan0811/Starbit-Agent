@@ -80,6 +80,7 @@ function SettingsPanel(): JSX.Element {
   const [shellArgs, setShellArgs] = useState('')
   const [compactionModelId, setCompactionModelId] = useState('')
   const [ffmpegPath, setFfmpegPath] = useState('')
+  const [errorReports, setErrorReports] = useState<Array<{ kind: string; time: string; version: string; platform: string; message: string }>>([])
   const [rules, setRules] = useState<PermissionRule[]>([])
   const [ruleLabel, setRuleLabel] = useState('Bash')
   const [rulePattern, setRulePattern] = useState('')
@@ -104,8 +105,9 @@ function SettingsPanel(): JSX.Element {
       window.starbit.settings.getCompaction(),
       window.starbit.settings.getVideo(),
       window.starbit.knowledge.getSettings(),
+      window.starbit.errors.list(),
       currentSessionId ? window.starbit.browser.getState(currentSessionId) : Promise.resolve(null)
-    ]).then(([keys, shell, nextRules, permission, compaction, video, embedding, browserState]) => {
+    ]).then(([keys, shell, nextRules, permission, compaction, video, embedding, errors, browserState]) => {
       setConfigured(keys)
       setShellExecutable(shell.executable)
       setShellArgs(shell.args.join(' '))
@@ -113,6 +115,7 @@ function SettingsPanel(): JSX.Element {
       setPlanDocPattern(permission.planDocPattern ?? '')
       setCompactionModelId(compaction.modelId ?? '')
       setFfmpegPath(video.ffmpegPath)
+      setErrorReports(errors)
       setEmbeddingMode(embedding.mode)
       setEmbeddingBaseUrl(embedding.baseUrl)
       setEmbeddingModel(embedding.model)
@@ -363,6 +366,18 @@ function SettingsPanel(): JSX.Element {
           <button className="panel-button panel-button--danger" onClick={() => void importData()}><HardDriveUpload size={14} /> {t('settings.importAll')}</button>
         </div>
         <p className="panel-message">{t('settings.dataNote')}</p>
+      </section>
+      <section className="settings-group">
+        <h3>{t('settings.errorReports')}</h3>
+        <div className="cache-diagnostic-list">
+          {errorReports.map((report, index) => (
+            <article key={index}>
+              <header><strong>{report.kind}</strong><time>{report.time}</time></header>
+              <p>{report.message}</p>
+            </article>
+          ))}
+          {errorReports.length === 0 && <EmptyText>{t('settings.noErrors')}</EmptyText>}
+        </div>
       </section>
       {message && <p className="panel-message" role="status">{message}</p>}
     </div>

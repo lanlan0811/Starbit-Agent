@@ -11,6 +11,7 @@ import { PtyHost } from '../pty/host'
 import { BrowserManager } from '../browser/manager'
 import type { BrowserBounds, BrowserControlMode } from '../browser/types'
 import { listWorkspaceFiles, readWorkspaceFilePreview } from '../workspace/list'
+import { listErrorReports } from '../security/updater'
 
 const sessions = new SessionManager()
 const settings = new SettingsService()
@@ -242,6 +243,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('memory:update', (_e, sessionId: string, id: string, content: string) => agents.updateMemory(sessionId, id, content))
   ipcMain.handle('memory:delete', (_e, sessionId: string, id: string) => agents.deleteMemory(sessionId, id))
   ipcMain.handle('memory:search', (_e, sessionId: string, query: string, scope?: import('../memory/types').MemoryScope) => agents.searchMemory(sessionId, query, scope))
+
+  ipcMain.handle('errors:list', () => listErrorReports(20))
 
   // Workspace
   ipcMain.handle('workspace:selectFolder', async () => {

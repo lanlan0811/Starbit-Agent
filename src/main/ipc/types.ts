@@ -132,6 +132,9 @@ export interface IpcApi {
     export(): Promise<{ path: string } | null>
     import(): Promise<{ path: string } | null>
   }
+  errors: {
+    list(): Promise<Array<{ kind: string; time: string; version: string; platform: string; message: string; stack?: string }>>
+  }
 }
 
 export interface UsageSummaryDto {

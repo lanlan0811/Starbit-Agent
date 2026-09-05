@@ -3,6 +3,7 @@ import { isAbsolute, join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { registerIpcHandlers, shutdownIpcServices } from './ipc'
 import { initDatabase } from './session/database'
+import { registerAutoUpdater, registerErrorReporting } from './security/updater'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -49,9 +50,11 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  registerErrorReporting()
   await initDatabase()
   registerIpcHandlers()
   createWindow()
+  if (!is.dev) registerAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
