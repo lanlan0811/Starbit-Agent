@@ -1,18 +1,19 @@
-import Database, { type Database as SqliteDatabase } from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { mkdirSync } from 'fs'
 import type { SessionEvent } from '@core/events'
+import { openSyncDatabase, openSyncDatabaseFromBytes, type SyncDatabaseDriver } from '../storage/driver'
 
 /**
- * SQLite 数据库层 —— 全本地存储（better-sqlite3 同步引擎，按计划 §5.2 技术选型）。
+ * SQLite 数据库层 —— 全本地存储（better-sqlite3 同步引擎，计划 §5.2 技术选型；
+ * 原生模块不可用时经存储驱动层回退 sql.js WASM，能力一致仅失去扩展加载）。
  * 表：sessions（会话）、events（append-only 事件日志）、whitelist（权限白名单）、
  *      usage（用量统计）、audit_log（审计日志）、settings（设置）。
  *
- * better-sqlite3 直接读写磁盘文件；导出/导入经 serialize() 与 Buffer 构造完成。
+ * 导出/导入经驱动 serialize() 与字节序列构造完成。
  */
 
-let db: SqliteDatabase | null = null
+let db: SyncDatabaseDriver | null = null
 let dbPath = ''
 
 function userDataDir(): string {
@@ -21,40 +22,40 @@ function userDataDir(): string {
   return dir
 }
 
-export async function initDatabase(): Promise<SqliteDatabase> {
+export async function initDatabase(): Promise<SyncDatabaseDriver> {
   if (db) return db
   dbPath = join(userDataDir(), 'starbit.db')
-  db = new Database(dbPath)
+  db = await openSyncDatabase({ path: dbPath })
   migrate()
   return db
 }
 
-export function getDb(): SqliteDatabase {
+export function getDb(): SyncDatabaseDriver {
   if (!db) throw new Error('数据库尚未初始化')
   return db
 }
 
-/** 兼容保留：better-sqlite3 同步写盘，无需手动落盘。 */
+/** 兼容保留：驱动层自行负责落盘时机。 */
 export function persist(): void {
   void db
 }
 
 /** 全量数据导出：整个 SQLite 库序列化为字节流（含会话、事件、白名单、审计与设置）。 */
 export function exportDatabase(): Uint8Array {
-  return new Uint8Array(getDb().serialize())
+  return getDb().serialize()
 }
 
 /** 全量数据导入：校验文件结构后整体替换当前库。 */
-export function importDatabase(bytes: Uint8Array): void {
-  let candidate: SqliteDatabase
+export async function importDatabase(bytes: Uint8Array): Promise<void> {
+  let candidate: SyncDatabaseDriver
   try {
-    candidate = new Database(Buffer.from(bytes))
+    candidate = await openSyncDatabaseFromBytes(bytes)
   } catch {
     throw new Error('导入文件不是有效的 Starbit 数据库备份')
   }
   try {
     const required = ['sessions', 'events', 'whitelist', 'settings']
-    const rows = candidate.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>
+    const rows = candidate.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'")
     const names = new Set(rows.map((row) => String(row.name)))
     const missing = required.filter((table) => !names.has(table))
     if (missing.length > 0) throw new Error(`备份缺少必需数据表: ${missing.join(', ')}`)
@@ -69,7 +70,7 @@ export function importDatabase(bytes: Uint8Array): void {
 
 function migrate(): void {
   const d = getDb()
-  d.pragma('foreign_keys = ON')
+  d.exec('PRAGMA foreign_keys = ON;')
   d.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -130,17 +131,19 @@ function migrate(): void {
   `)
 }
 
-/** 通用查询辅助 */
-function all<T>(sql: string, params: unknown[] = []): T[] {
-  return getDb().prepare(sql).all(...params) as T[]
+/** 通用查询辅助（参数约束见驱动层 SqlParam） */
+type SqlParam = import('../storage/driver').SqlParam
+
+function all<T>(sql: string, params: SqlParam[] = []): T[] {
+  return getDb().all<T>(sql, params)
 }
 
-function get<T>(sql: string, params: unknown[] = []): T | undefined {
-  return getDb().prepare(sql).get(...params) as T | undefined
+function get<T>(sql: string, params: SqlParam[] = []): T | undefined {
+  return getDb().get<T>(sql, params)
 }
 
-function run(sql: string, params: unknown[] = []): void {
-  getDb().prepare(sql).run(...params)
+function run(sql: string, params: SqlParam[] = []): void {
+  getDb().run(sql, params)
 }
 
 export interface SessionRow {

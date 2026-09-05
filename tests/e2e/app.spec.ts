@@ -1,5 +1,5 @@
 import { test, expect, _electron as electron } from '@playwright/test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { IpcApi } from '../../src/main/ipc/types'
@@ -103,6 +103,116 @@ test('自定义模型经流式工具循环完成文件操作，并允许取消�
     expect(received).toHaveLength(2)
     await window.reload()
     await expect(window.getByText('文件已写入，验证完成。', { exact: true })).toBeVisible()
+  } finally {
+    await app.close()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+    await rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
+test('并行子代理回传摘要后主代理收尾，运行中可取消', async () => {
+  test.setTimeout(120_000)
+  const userDataDir = await mkdtemp(join(tmpdir(), 'starbit-task-e2e-'))
+  const received: Array<Record<string, unknown>> = []
+  const subRequestCounts = new Map<string, number>()
+  let mainRequests = 0
+  const server = createServer(async (request, response) => {
+    let body = ''
+    for await (const chunk of request) body += String(chunk)
+    const parsed = JSON.parse(body) as Record<string, unknown>
+    received.push(parsed)
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    const send = (payload: Record<string, unknown>): void => {
+      response.write(`data: ${JSON.stringify(payload)}\n\n`)
+    }
+    const end = (): void => {
+      send({ usage: { prompt_tokens: 2000, prompt_tokens_details: { cached_tokens: 1950 }, completion_tokens: 30 } })
+      response.end('data: [DONE]\n\n')
+    }
+    const cacheKey = String(parsed.prompt_cache_key ?? '')
+    if (cacheKey.startsWith('subagent')) {
+      const count = (subRequestCounts.get(cacheKey) ?? 0) + 1
+      subRequestCounts.set(cacheKey, count)
+      if (count === 1) {
+        // 每个子代理的首轮：读取工作区文件
+        send({ choices: [{ delta: { tool_calls: [{ index: 0, id: `read-${cacheKey.slice(-4)}`, function: { name: 'Read', arguments: JSON.stringify({ path: 'e2e-sub.txt' }) } }] } }] })
+      } else {
+        // 次轮：回传摘要（此时消息里已带 Read 结果）
+        send({ choices: [{ delta: { content: '子代理摘要完成' } }] })
+      }
+      end()
+      return
+    }
+    mainRequests += 1
+    if (mainRequests === 1) {
+      // 主代理首轮：单次 Task 调用并行派生 explore + general 两个子代理
+      send({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'task-1', function: { name: 'Task', arguments: JSON.stringify({
+        tasks: [
+          { prompt: '检查工作区文件', type: 'explore' },
+          { prompt: '总结工作区内容', type: 'general-purpose' }
+        ]
+      }) } }] } }] })
+      end()
+    } else if (mainRequests === 2) {
+      send({ choices: [{ delta: { content: '并行子代理完成' } }] })
+      end()
+    } else {
+      // 第三次主请求：挂起以验证运行中取消
+      await new Promise((resolve) => setTimeout(resolve, 30_000))
+      try {
+        send({ choices: [{ delta: { content: '不应出现' } }] })
+      } catch { /* 客户端已断开 */ }
+      end()
+    }
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address() as AddressInfo
+  const app = await electron.launch({ args: ['.'], env: { ...process.env, STARBIT_USER_DATA_DIR: userDataDir } })
+  try {
+    const window = await app.firstWindow()
+    await expect(window.getByRole('navigation', { name: '主导航' })).toBeVisible()
+    await window.evaluate(async ({ workspace, endpoint }) => {
+      const api = (window as unknown as { starbit: IpcApi }).starbit
+      const template = (await api.models.list())[0]
+      await api.models.save({ ...template, id: 'e2e-task-model', name: 'E2E Task Model', vendor: 'Local Test', custom: true,
+        baseURL: endpoint, apiKeyRequired: false, usageCacheScope: 'nested', usageCachedTokensPath: 'cached_tokens',
+        thinking: { low: { params: {} }, high: { params: {} }, max: { params: {} } } })
+      await api.session.create(workspace, { title: '子代理实测', model: 'e2e-task-model', mode: 'fullAccess' })
+    }, { workspace: userDataDir, endpoint: `http://127.0.0.1:${address.port}/v1` })
+    await writeFile(join(userDataDir, 'e2e-sub.txt'), '子代理要读的内容', 'utf8')
+    await window.reload()
+    const input = window.getByPlaceholder('描述你的任务，支持 /命令 和 @文件...')
+    await input.fill('并行研究工作区')
+    await window.getByTitle('发送', { exact: true }).click()
+    await expect(window.getByText('并行子代理完成', { exact: true })).toBeVisible({ timeout: 60_000 })
+
+    // 两个子代理各自完成 initialize 后的两轮请求
+    expect(mainRequests).toBe(2)
+    expect(subRequestCounts.size).toBe(2)
+    for (const count of subRequestCounts.values()) expect(count).toBe(2)
+    // 主代理第二轮消息包含 Task 工具结果（两个子代理的摘要）
+    const secondMain = received.filter((body) => !String(body.prompt_cache_key ?? '').startsWith('subagent'))[1]
+    const toolMessages = (secondMain.messages as Array<{ role: string; content: string }>).filter((message) => message.role === 'tool')
+    expect(toolMessages.some((message) => message.content.includes('子代理 1') && message.content.includes('子代理摘要完成'))).toBe(true)
+    // 子代理第二轮消息包含 Read 工具结果（按 cacheKey 分组取各自第二条请求）
+    const subBodies = received.filter((body) => String(body.prompt_cache_key ?? '').startsWith('subagent'))
+    const secondPerKey = new Map<string, Record<string, unknown>>()
+    for (const body of subBodies) {
+      const key = String(body.prompt_cache_key)
+      secondPerKey.set(key, body) // 后写覆盖，最终保留每个键的第二条
+    }
+    expect(secondPerKey.size).toBe(2)
+    for (const body of secondPerKey.values()) {
+      expect((body.messages as Array<{ role: string; content: string }>).some((message) => message.role === 'tool' && message.content.includes('子代理要读的内容'))).toBe(true)
+    }
+
+    // 运行中取消：主请求挂起 30s，点击停止后状态回到空闲
+    await input.fill('取消这条任务')
+    await window.getByTitle('发送', { exact: true }).click()
+    await expect(window.getByText('运行中')).toBeVisible()
+    await window.getByTitle('停止 (Esc)', { exact: true }).click()
+    await expect(window.getByText('空闲')).toBeVisible({ timeout: 10_000 })
+    expect(mainRequests).toBe(3)
   } finally {
     await app.close()
     await new Promise<void>((resolve) => server.close(() => resolve()))

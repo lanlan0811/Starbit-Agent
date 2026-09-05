@@ -1,6 +1,6 @@
-import Database, { type Database as SqliteDatabase } from 'better-sqlite3'
 import * as sqliteVec from 'sqlite-vec'
 import { createHash, randomUUID } from 'node:crypto'
+import { openSyncDatabase, type SqlParam, type SyncDatabaseDriver } from '../storage/driver'
 import { dirname, join, resolve } from 'node:path'
 import { mkdir } from 'node:fs/promises'
 import { chunkText } from './chunking'
@@ -90,7 +90,7 @@ export class KnowledgeStore {
   private vecDimensions: number | null = null
 
   private constructor(
-    private readonly database: SqliteDatabase,
+    private readonly database: SyncDatabaseDriver,
     options: KnowledgeStoreOptions
   ) {
     this.workspacePath = resolve(options.workspacePath)
@@ -115,8 +115,7 @@ export class KnowledgeStore {
       ? ':memory:'
       : resolve(options.databasePath ?? join(resolve(options.workspacePath), '.starbit', 'knowledge.db'))
     if (databasePath !== ':memory:') await mkdir(dirname(databasePath), { recursive: true })
-    // @ts-expect-error enableLoadExtension 在 @types/better-sqlite3 9.x 中缺失，v13 运行时支持
-    const database = new Database(databasePath, { enableLoadExtension: true })
+    const database = await openSyncDatabase({ path: databasePath })
     const store = new KnowledgeStore(database, { ...options, databasePath })
     return store
   }
@@ -345,7 +344,7 @@ export class KnowledgeStore {
     }
   }
 
-  /** vec 命中行补全文档信息并按余弦分数归一（distance → similarity）。 */
+  /** vec 命中行补全文档信息；分数与余弦语义对齐，用主向量重算（vec0 默认 L2 距离）。 */
   private hydrateHits(
     hits: Array<{ chunkId: string; distance: number }>,
     model: string,
@@ -365,15 +364,11 @@ export class KnowledgeStore {
       JOIN knowledge_documents d ON d.id = c.document_id
       WHERE c.id IN (${placeholders}) AND d.status = 'indexed'
     `, hits.map((hit) => hit.chunkId))
-    const distanceById = new Map(hits.map((hit) => [hit.chunkId, hit.distance]))
     return rows
       .filter((row) => !knowledgeBaseId || row.knowledge_base_id === knowledgeBaseId)
       .filter((row) => row.embedding_model === model && numberValue(row.embedding_dimensions) === dimensions)
       .map((row) => {
-        const distance = distanceById.get(row.id)
-        // vec0 默认 L2 距离；与余弦语义对齐用主向量重算分数
         const score = cosineSimilarity(queryVector, decodeVector(row.embedding))
-        void distance
         return Number.isFinite(score) && score >= minimumScore ? searchHitFromRow(row, score) : null
       })
       .filter((row): row is KnowledgeSearchHit => row !== null)
@@ -540,7 +535,7 @@ export class KnowledgeStore {
   }
 
   private migrate(): void {
-    this.database.pragma('foreign_keys = ON')
+    this.database.exec('PRAGMA foreign_keys = ON;')
     this.database.exec(`
       CREATE TABLE IF NOT EXISTS knowledge_bases (
         id TEXT PRIMARY KEY,
@@ -586,8 +581,10 @@ export class KnowledgeStore {
       CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_base ON knowledge_chunks(knowledge_base_id, document_id, ordinal);
     `)
     try {
-      sqliteVec.load(this.database)
-      this.vecAvailable = true
+      if (this.database.supportsExtensions && this.database.nativeHandle) {
+        sqliteVec.load(this.database.nativeHandle as Parameters<typeof sqliteVec.load>[0])
+        this.vecAvailable = true
+      }
       const existing = this.get<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'knowledge_vec'")
       if (existing) {
         try {
@@ -613,16 +610,16 @@ export class KnowledgeStore {
 
   private run(sql: string, params: SqlParam[] = []): void {
     this.ensureOpen()
-    this.database.prepare(sql).run(...params)
+    this.database.run(sql, params)
   }
 
   private all<T>(sql: string, params: SqlParam[] = []): T[] {
     this.ensureOpen()
-    return this.database.prepare(sql).all(...params) as T[]
+    return this.database.all<T>(sql, params)
   }
 
   private get<T>(sql: string, params: SqlParam[] = []): T | undefined {
-    return this.database.prepare(sql).get(...params) as T | undefined
+    return this.database.get<T>(sql, params)
   }
 
   private async withMutation<T>(operation: () => Promise<T>): Promise<T> {
@@ -640,8 +637,6 @@ export class KnowledgeStore {
     if (this.closed) throw new Error('知识库已关闭')
   }
 }
-
-type SqlParam = string | number | bigint | Buffer | null
 
 interface DocumentRow {
   id: string

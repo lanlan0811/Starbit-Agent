@@ -1,7 +1,10 @@
 import { app, dialog, BrowserWindow } from 'electron'
-import { autoUpdater } from 'electron-updater'
+// electron-updater 是 CommonJS 模块，ESM 环境必须经默认导出解构，否则主进程加载即失败
+import electronUpdater from 'electron-updater'
 import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+
+const { autoUpdater } = electronUpdater
 
 /** 本地错误报告目录（userData/error-reports.log） */
 export function errorReportPath(): string {
