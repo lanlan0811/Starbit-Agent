@@ -1,10 +1,12 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { promises as fsPromises, existsSync } from 'node:fs'
 import type { MainToRendererEvent } from './types'
 import { SessionManager } from '../session/manager'
 import type { ModelConfig } from '@core/models'
 import { AgentManager } from '../agent/manager'
 import { SettingsService } from '../security/settings'
-import { deleteWhitelist, listWhitelist } from '../session/database'
+import { deleteWhitelist, listWhitelist, exportDatabase, importDatabase, writeAudit } from '../session/database'
+import { importSessionArchive, parseSessionArchive, sessionToMarkdown, type SessionArchive } from '../session/export'
 import { PtyHost } from '../pty/host'
 import { BrowserManager } from '../browser/manager'
 import type { BrowserBounds, BrowserControlMode } from '../browser/types'
@@ -50,6 +52,61 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('session:get', (_e, id: string) => sessions.get(id))
   ipcMain.handle('session:update', (_e, id: string, patch: { title?: string; mode?: import('@core/events').PermissionMode; model?: string }) => sessions.update(id, patch))
   ipcMain.handle('session:replay', (_e, id: string) => sessions.replay(id))
+  ipcMain.handle('session:export', async (_e, id: string, format: 'markdown' | 'json') => {
+    const session = requireSession(id)
+    const events = sessions.replay(id)
+    const win = BrowserWindow.getFocusedWindow()
+    const safeTitle = session.title.replace(/[\\/:*?"<>|]+/g, '_') || '会话'
+    const result = await dialog.showSaveDialog(win!, {
+      defaultPath: `${safeTitle}.${format === 'markdown' ? 'md' : 'json'}`,
+      filters: format === 'markdown'
+        ? [{ name: 'Markdown 转写稿', extensions: ['md'] }]
+        : [{ name: 'Starbit 会话归档', extensions: ['json'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    const content = format === 'markdown'
+      ? sessionToMarkdown(session, events)
+      : JSON.stringify(toSessionArchive(session, events), null, 2)
+    await writeFile(result.filePath, content)
+    writeAudit('session-exported', JSON.stringify({ sessionId: id, format }))
+    return { path: result.filePath }
+  })
+  ipcMain.handle('session:import', async (_e, workspacePath: string) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile'],
+      filters: [{ name: 'Starbit 会话归档', extensions: ['json'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const parsed = parseSessionArchive(await readFile(result.filePaths[0]))
+    const resolvedWorkspace = await resolveImportWorkspace(parsed.workspacePath, workspacePath)
+    const session = importSessionArchive(sessions, resolvedWorkspace, parsed)
+    writeAudit('session-imported', JSON.stringify({ sessionId: session.id, events: parsed.events.length }))
+    return session
+  })
+  ipcMain.handle('data:export', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showSaveDialog(win!, {
+      defaultPath: `starbit-backup-${new Date().toISOString().slice(0, 10)}.starbit.db`,
+      filters: [{ name: 'Starbit 数据备份', extensions: ['db'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    await writeFileBinary(result.filePath, exportDatabase())
+    writeAudit('data-exported', JSON.stringify({ path: result.filePath }))
+    return { path: result.filePath }
+  })
+  ipcMain.handle('data:import', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile'],
+      filters: [{ name: 'Starbit 数据备份', extensions: ['db'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    importDatabase(await readFileBinary(result.filePaths[0]))
+    await agents.resetCaches()
+    writeAudit('data-imported', JSON.stringify({ path: result.filePaths[0] }))
+    return { path: result.filePaths[0] }
+  })
 
   // Models
   ipcMain.handle('models:list', () => agents.listModels())
@@ -209,4 +266,37 @@ function requireSession(sessionId: string): NonNullable<ReturnType<SessionManage
   const session = sessions.get(sessionId)
   if (!session) throw new Error(`会话不存在: ${sessionId}`)
   return session
+}
+
+function toSessionArchive(session: NonNullable<ReturnType<SessionManager['get']>>, events: import('@core/events').SessionEvent[]): SessionArchive {
+  return {
+    kind: 'starbit-session',
+    version: 1,
+    exportedAt: Date.now(),
+    session: { title: session.title, workspacePath: session.workspacePath, mode: session.mode, model: session.model, createdAt: session.createdAt },
+    events
+  }
+}
+
+/** 导入会话的工作区解析：优先归档内且真实存在的工作区路径，否则回退当前工作区。 */
+async function resolveImportWorkspace(archiveWorkspace: string | undefined, fallback: string): Promise<string> {
+  if (archiveWorkspace && existsSync(archiveWorkspace)) return archiveWorkspace
+  if (fallback) return fallback
+  throw new Error('无法确定导入会话的工作区：请先在当前会话中选择一个工作区')
+}
+
+async function writeFile(path: string, content: string): Promise<void> {
+  await fsPromises.writeFile(path, content, 'utf8')
+}
+
+async function writeFileBinary(path: string, content: Uint8Array): Promise<void> {
+  await fsPromises.writeFile(path, content)
+}
+
+async function readFileBinary(path: string): Promise<Uint8Array> {
+  return new Uint8Array(await fsPromises.readFile(path))
+}
+
+async function readFile(path: string): Promise<string> {
+  return fsPromises.readFile(path, 'utf8')
 }

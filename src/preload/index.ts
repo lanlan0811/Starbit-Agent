@@ -10,7 +10,9 @@ const api: IpcApi = {
     list: () => ipcRenderer.invoke('session:list'),
     get: (id) => ipcRenderer.invoke('session:get', id),
     update: (id, patch) => ipcRenderer.invoke('session:update', id, patch),
-    replay: (id) => ipcRenderer.invoke('session:replay', id)
+    replay: (id) => ipcRenderer.invoke('session:replay', id),
+    export: (id, format) => ipcRenderer.invoke('session:export', id, format),
+    import: (workspacePath) => ipcRenderer.invoke('session:import', workspacePath)
   },
   models: {
     list: () => ipcRenderer.invoke('models:list'),
@@ -100,6 +102,10 @@ const api: IpcApi = {
     selectFolder: () => ipcRenderer.invoke('workspace:selectFolder'),
     listFiles: (workspacePath) => ipcRenderer.invoke('workspace:listFiles', workspacePath),
     readFile: (workspacePath, path) => ipcRenderer.invoke('workspace:readFile', workspacePath, path)
+  },
+  data: {
+    export: () => ipcRenderer.invoke('data:export'),
+    import: () => ipcRenderer.invoke('data:import')
   }
 }
 

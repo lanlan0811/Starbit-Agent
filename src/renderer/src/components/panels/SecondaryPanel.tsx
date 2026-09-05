@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, Brain, FolderOpen, KeyRound, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
+import { BookOpen, Brain, FileDown, FileUp, FolderOpen, HardDriveDownload, HardDriveUpload, KeyRound, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import type { AuditDto, McpServerConfigDto, McpServerStateDto, UsageReportDto } from '../../../../main/ipc/types'
 import type { PermissionRule } from '@core/permission/rules'
 import { useAppStore } from '../../stores/app'
@@ -198,6 +198,56 @@ function SettingsPanel(): JSX.Element {
     setMessage('浏览器安全设置已保存到当前会话。')
   }
 
+  const exportSession = async (format: 'markdown' | 'json'): Promise<void> => {
+    if (!currentSessionId) return
+    const result = await window.starbit.session.export(currentSessionId, format)
+    setMessage(result ? `会话已导出到 ${result.path}` : '导出已取消。')
+  }
+
+  const importSession = async (): Promise<void> => {
+    try {
+      const session = await window.starbit.session.import(useAppStore.getState().workspacePath)
+      if (session) {
+        const state = useAppStore.getState()
+        state.setSessions([session, ...state.sessions])
+        setMessage(`会话已导入：${session.title}`)
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const exportData = async (): Promise<void> => {
+    const result = await window.starbit.data.export()
+    setMessage(result ? `数据已备份到 ${result.path}` : '导出已取消。')
+  }
+
+  const importData = async (): Promise<void> => {
+    if (!window.confirm('导入备份将覆盖现有会话与设置，且不可撤销。确定继续吗？')) return
+    try {
+      const result = await window.starbit.data.import()
+      if (!result) return
+      const sessions = await window.starbit.session.list()
+      const state = useAppStore.getState()
+      state.setSessions(sessions)
+      const first = sessions[0]
+      if (first) {
+        const [meta, events] = await Promise.all([window.starbit.session.get(first.id), window.starbit.session.replay(first.id)])
+        if (meta) {
+          state.setCurrentSessionId(meta.id, events)
+          state.setWorkspacePath(meta.workspacePath)
+          state.setMode(meta.mode)
+          state.setModel(meta.model || 'qwen3.8-max')
+        }
+      } else {
+        state.setCurrentSessionId(null, [])
+      }
+      setMessage('数据导入完成。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   return (
     <div className="panel-stack">
       <section className="settings-group">
@@ -288,6 +338,19 @@ function SettingsPanel(): JSX.Element {
         <h3><Brain size={15} /> 记忆</h3>
         <p className="panel-message">用户级与工作区级 memory.md 会在每轮自动加载；AGENTS.md 始终只读。</p>
         <button className="panel-button" onClick={() => useAppStore.getState().setActiveSection('memory')}>打开记忆管理</button>
+      </section>
+      <section className="settings-group">
+        <h3>数据管理</h3>
+        <div className="panel-actions">
+          <button className="panel-button" disabled={!currentSessionId} onClick={() => void exportSession('markdown')}><FileDown size={14} /> 导出当前会话 (Markdown)</button>
+          <button className="panel-button" disabled={!currentSessionId} onClick={() => void exportSession('json')}><FileDown size={14} /> 导出当前会话 (JSON)</button>
+          <button className="panel-button" onClick={() => void importSession()}><FileUp size={14} /> 导入会话</button>
+        </div>
+        <div className="panel-actions">
+          <button className="panel-button" onClick={() => void exportData()}><HardDriveDownload size={14} /> 导出全部数据</button>
+          <button className="panel-button panel-button--danger" onClick={() => void importData()}><HardDriveUpload size={14} /> 导入全部数据（覆盖）</button>
+        </div>
+        <p className="panel-message">全量备份包含会话、事件、白名单、审计与设置；导入会覆盖现有数据并重载。</p>
       </section>
       {message && <p className="panel-message" role="status">{message}</p>}
     </div>

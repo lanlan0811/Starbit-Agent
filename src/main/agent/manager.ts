@@ -468,12 +468,18 @@ export class AgentManager {
 
   async shutdown(): Promise<void> {
     for (const sessionId of this.active.keys()) this.cancel(sessionId)
+    await this.resetCaches()
+    await this.mcp.close()
+  }
+
+  /** 数据导入后清空会话运行时与知识库缓存，保证后续请求基于新数据重建。 */
+  async resetCaches(): Promise<void> {
+    for (const sessionId of this.active.keys()) this.cancel(sessionId)
     const stores = await Promise.allSettled(this.knowledgeStores.values())
     await Promise.allSettled(stores.flatMap((result) => result.status === 'fulfilled' ? [result.value.close()] : []))
     this.knowledgeStores.clear()
     this.sessionRuntimes.clear()
     this.prefixTrackers.clear()
-    await this.mcp.close()
   }
 
   getKnowledgeSettings(): KnowledgeSettings {

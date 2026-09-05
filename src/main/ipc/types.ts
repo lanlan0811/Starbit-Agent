@@ -36,6 +36,8 @@ export interface IpcApi {
     get(id: string): Promise<SessionMeta | null>
     update(id: string, patch: Partial<Pick<SessionMeta, 'title' | 'mode' | 'model'>>): Promise<void>
     replay(id: string): Promise<SessionEvent[]>
+    export(id: string, format: 'markdown' | 'json'): Promise<{ path: string } | null>
+    import(workspacePath: string): Promise<SessionMeta | null>
   }
   models: {
     list(): Promise<ModelConfig[]>
@@ -125,6 +127,10 @@ export interface IpcApi {
     selectFolder(): Promise<{ path: string } | null>
     listFiles(workspacePath: string): Promise<WorkspaceEntryDto[]>
     readFile(workspacePath: string, path: string): Promise<{ path: string; content: string; truncated: boolean }>
+  }
+  data: {
+    export(): Promise<{ path: string } | null>
+    import(): Promise<{ path: string } | null>
   }
 }
 

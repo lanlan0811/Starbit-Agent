@@ -16,6 +16,7 @@ import type { SessionEvent } from '@core/events'
  */
 
 let db: Database | null = null
+let SQL: initSqlJs.SqlJsStatic | null = null
 let dbPath = ''
 const nodeRequire = createRequire(import.meta.url)
 
@@ -41,7 +42,7 @@ function locateWasmFile(): string {
 export async function initDatabase(): Promise<Database> {
   if (db) return db
   dbPath = join(userDataDir(), 'starbit.db')
-  const SQL = await initSqlJs({ locateFile: locateWasmFile })
+  SQL = await initSqlJs({ locateFile: locateWasmFile })
   if (existsSync(dbPath)) {
     db = new SQL.Database(readFileSync(dbPath))
   } else {
@@ -63,6 +64,36 @@ export function persist(): void {
   if (!db) return
   const data = db.export()
   writeFileSync(dbPath, Buffer.from(data))
+}
+
+/** 全量数据导出：整个 SQLite 库序列化为字节流（含会话、事件、白名单、审计与设置）。 */
+export function exportDatabase(): Uint8Array {
+  return getDb().export()
+}
+
+/** 全量数据导入：校验文件结构后整体替换当前库并落盘。 */
+export function importDatabase(bytes: Uint8Array): void {
+  if (!SQL) throw new Error('数据库尚未初始化')
+  let candidate: Database
+  try {
+    candidate = new SQL.Database(bytes)
+  } catch {
+    throw new Error('导入文件不是有效的 Starbit 数据库备份')
+  }
+  try {
+    const required = ['sessions', 'events', 'whitelist', 'settings']
+    const result = candidate.exec("SELECT name FROM sqlite_master WHERE type = 'table'")
+    const names = new Set((result[0]?.values ?? []).map((row) => String(row[0])))
+    const missing = required.filter((table) => !names.has(table))
+    if (missing.length > 0) throw new Error(`备份缺少必需数据表: ${missing.join(', ')}`)
+  } catch (error) {
+    candidate.close()
+    throw error
+  }
+  db?.close()
+  db = candidate
+  migrate()
+  persist()
 }
 
 function migrate(): void {

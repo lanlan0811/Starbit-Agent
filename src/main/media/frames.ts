@@ -35,7 +35,7 @@ const DEFAULT_TIMEOUT_MS = 60_000
 /** 用 ffmpeg 将视频按帧采样为 JPEG data URL 序列。 */
 export function createVideoFrameExtractor(options: FrameExtractorOptions = {}): VideoFrameExtractor {
   const run = options.run ?? defaultRun
-  return async (source, mimeType) => {
+  return async (source, _mimeType) => {
     if (/^data:/i.test(source)) throw new Error('抽帧输入需要本地视频文件路径，data URL 请使用支持 video_url 的模型')
     if (/^https?:\/\//i.test(source)) throw new Error('抽帧输入需要本地视频文件路径，远程视频请先下载到工作区')
     const ffmpegPath = options.ffmpegPath?.trim() || 'ffmpeg'
