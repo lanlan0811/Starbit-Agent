@@ -35,6 +35,7 @@ import type { CacheDiagnostic, CompactionConfirmationRequest } from './loop'
 import { registerTodoTools } from '../tools/todo'
 import { registerSandboxTools } from '../tools/sandbox'
 import { registerTaskTools, type SubagentRequest, type SubagentResult } from '../tools/task'
+import { createVideoFrameExtractor } from '../media/frames'
 import { estimateCost, sumCost } from './usage-cost'
 import type { ToolContext } from '@core/tools/types'
 
@@ -136,6 +137,7 @@ export class AgentManager {
   private readonly pendingPermissions = new Map<string, PendingPermission>()
   private readonly pendingCompactions = new Map<string, PendingCompaction>()
   private readonly provider = new OpenAiCompatibleProvider()
+  private videoFrameExtractor?: (source: string, mimeType?: string) => Promise<string[]>
   private readonly mcp = new McpManager()
   private readonly knowledgeStores = new Map<string, Promise<KnowledgeStore>>()
   private readonly memoryStores = new Map<string, MemoryStore>()
@@ -188,6 +190,7 @@ export class AgentManager {
         prefixTracker: this.getPrefixTracker(sessionId),
         compactionModel: this.resolveCompactionModel(model),
         compactionApiKey: this.resolveCompactionApiKey(),
+        videoFrameExtractor: this.resolveVideoFrameExtractor(),
         onEvent: (event) => this.recordEvent(event),
         onDelta: (delta) => this.push({ type: 'agent/delta', sessionId, ...delta }),
         onContextStatus: (status) => this.push({ type: 'context/status', sessionId, status }),
@@ -369,6 +372,17 @@ export class AgentManager {
     writeAudit('compaction-settings-updated', JSON.stringify({ modelId: modelId || null }))
   }
 
+  /** 视频抽帧设置（ffmpeg 路径；留空使用 PATH 中的 ffmpeg）。 */
+  getVideoSettings(): { ffmpegPath: string } {
+    return { ffmpegPath: this.settings.getString('video:ffmpegPath', '') }
+  }
+
+  setVideoSettings(patch: { ffmpegPath?: string }): void {
+    if (!('ffmpegPath' in patch)) return
+    this.settings.setString('video:ffmpegPath', patch.ffmpegPath?.trim() ?? '')
+    writeAudit('video-settings-updated', JSON.stringify({ ffmpegPath: patch.ffmpegPath?.trim() || null }))
+  }
+
   private resolveCompactionModel(fallback: ModelConfig): ModelConfig {
     const modelId = this.settings.getString('compaction:modelId', '')
     if (!modelId) return fallback
@@ -380,6 +394,18 @@ export class AgentManager {
     if (!modelId) return undefined
     return this.settings.getSecret(`model:${modelId}:apiKey`) || undefined
   }
+
+  /** 视频抽帧实现；ffmpeg 路径可在设置中调整，惰性创建以跟随最新配置。 */
+  private resolveVideoFrameExtractor(): (source: string, mimeType?: string) => Promise<string[]> {
+    const ffmpegPath = this.settings.getString('video:ffmpegPath', '')
+    if (!this.videoFrameExtractor || this.extractorFfmpegPath !== ffmpegPath) {
+      this.extractorFfmpegPath = ffmpegPath
+      this.videoFrameExtractor = createVideoFrameExtractor({ ffmpegPath })
+    }
+    return this.videoFrameExtractor
+  }
+
+  private extractorFfmpegPath?: string
 
   /** 读取权限相关设置（计划文档规则等）。 */
   getPermissionSettings(): { planDocPattern: string | null } {

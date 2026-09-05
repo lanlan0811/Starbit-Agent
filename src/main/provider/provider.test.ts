@@ -86,6 +86,42 @@ describe('Provider 请求组装', () => {
     ).rejects.toThrow('API Key')
     expect(() => resolveEndpoint('localhost:11434/v1', 'chat-completions')).toThrow('baseURL')
   })
+
+  it('视频按模型策略转换为 video_url 或抽帧图片序列', async () => {
+    const echoSource = async (source: string): Promise<string> => source
+    const media = [{ kind: 'video' as const, source: 'D:/media/clip.mp4', mimeType: 'video/mp4' }]
+    const native = JSON.parse(String((await prepareProviderRequest({
+      model: model('qwen3.8-max'),
+      apiKey: 'k',
+      thinkingLevel: 'low',
+      messages: [{ role: 'user', content: media }]
+    }, echoSource)).init.body))
+    expect(native.messages[0].content).toEqual([{ type: 'video_url', video_url: { url: 'D:/media/clip.mp4' } }])
+
+    const frames = ['data:image/jpeg;base64,AAA', 'data:image/jpeg;base64,BBB']
+    const degraded = JSON.parse(String((await prepareProviderRequest({
+      model: model('deepseek-v4-flash-vision-exp'),
+      apiKey: 'k',
+      thinkingLevel: 'low',
+      messages: [{ role: 'user', content: media }]
+    }, echoSource, async () => frames)).init.body))
+    expect(degraded.messages[0].content).toEqual([
+      { type: 'text', text: '[视频已按帧采样为 2 张图片]' },
+      { type: 'image_url', image_url: { url: frames[0] } },
+      { type: 'image_url', image_url: { url: frames[1] } }
+    ])
+  })
+
+  it('不支持视频的模型直接报错且不抽帧', async () => {
+    await expect(
+      prepareProviderRequest({
+        model: model('glm-5.2'),
+        apiKey: 'k',
+        thinkingLevel: 'low',
+        messages: [{ role: 'user', content: [{ kind: 'video', source: 'D:/media/clip.mp4' }] }]
+      }, async (source) => source, async () => { throw new Error('不应调用抽帧') })
+    ).rejects.toThrow('不支持视频输入')
+  })
 })
 
 describe('usage 归一化', () => {

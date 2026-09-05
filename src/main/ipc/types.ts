@@ -69,6 +69,8 @@ export interface IpcApi {
     setShell(shell: { executable: string; args: string[] }): Promise<void>
     getCompaction(): Promise<{ modelId: string | null }>
     setCompaction(patch: { modelId?: string | null }): Promise<void>
+    getVideo(): Promise<{ ffmpegPath: string }>
+    setVideo(patch: { ffmpegPath?: string }): Promise<void>
   }
   skills: {
     list(workspacePath: string): Promise<Array<{ name: string; description: string; root: string; markdownPath: string; scripts: string[]; scope: 'user' | 'workspace' }>>

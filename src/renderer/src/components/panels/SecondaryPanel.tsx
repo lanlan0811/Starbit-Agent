@@ -74,6 +74,7 @@ function SettingsPanel(): JSX.Element {
   const [shellExecutable, setShellExecutable] = useState('')
   const [shellArgs, setShellArgs] = useState('')
   const [compactionModelId, setCompactionModelId] = useState('')
+  const [ffmpegPath, setFfmpegPath] = useState('')
   const [rules, setRules] = useState<PermissionRule[]>([])
   const [ruleLabel, setRuleLabel] = useState('Bash')
   const [rulePattern, setRulePattern] = useState('')
@@ -96,15 +97,17 @@ function SettingsPanel(): JSX.Element {
       window.starbit.permission.listRules(),
       window.starbit.permission.getSettings(),
       window.starbit.settings.getCompaction(),
+      window.starbit.settings.getVideo(),
       window.starbit.knowledge.getSettings(),
       currentSessionId ? window.starbit.browser.getState(currentSessionId) : Promise.resolve(null)
-    ]).then(([keys, shell, nextRules, permission, compaction, embedding, browserState]) => {
+    ]).then(([keys, shell, nextRules, permission, compaction, video, embedding, browserState]) => {
       setConfigured(keys)
       setShellExecutable(shell.executable)
       setShellArgs(shell.args.join(' '))
       setRules(nextRules)
       setPlanDocPattern(permission.planDocPattern ?? '')
       setCompactionModelId(compaction.modelId ?? '')
+      setFfmpegPath(video.ffmpegPath)
       setEmbeddingMode(embedding.mode)
       setEmbeddingBaseUrl(embedding.baseUrl)
       setEmbeddingModel(embedding.model)
@@ -140,6 +143,11 @@ function SettingsPanel(): JSX.Element {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  const saveVideo = async (): Promise<void> => {
+    await window.starbit.settings.setVideo({ ffmpegPath })
+    setMessage('视频抽帧设置已保存。')
   }
 
   const saveEmbedding = async (): Promise<void> => {
@@ -221,6 +229,9 @@ function SettingsPanel(): JSX.Element {
           {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
         </select>
         <button className="panel-button" onClick={() => void saveCompaction()}><Save size={14} /> 保存压缩设置</button>
+        <label>ffmpeg 路径（视频抽帧降级；留空使用系统 PATH）</label>
+        <input value={ffmpegPath} onChange={(event) => setFfmpegPath(event.target.value)} placeholder="ffmpeg" />
+        <button className="panel-button" onClick={() => void saveVideo()}><Save size={14} /> 保存视频设置</button>
       </section>
       <ModelEditor />
       <section className="settings-group">

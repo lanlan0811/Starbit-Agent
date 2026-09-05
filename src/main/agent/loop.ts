@@ -54,6 +54,8 @@ export interface AgentLoopOptions {
   beforeCompact?: (request: CompactionConfirmationRequest) => Promise<{ allowed: boolean; reason?: string }>
   compactionModel?: ModelConfig
   compactionApiKey?: string
+  /** 视频抽帧降级实现（ffmpeg）；未配置时要求 video_url 策略的模型 */
+  videoFrameExtractor?: (source: string, mimeType?: string) => Promise<string[]>
 }
 
 export interface CompactionConfirmationRequest extends Omit<ContextStatus, 'level'> {
@@ -202,6 +204,7 @@ export class AgentLoop {
       tools,
       thinkingLevel: this.options.thinkingLevel,
       promptCacheKey: this.options.sessionId,
+      extractVideoFrames: this.options.videoFrameExtractor,
       signal: this.controller?.signal
     })) {
       if (event.type === 'text-delta') {
@@ -283,8 +286,24 @@ export class AgentLoop {
       const outcome = outcomes.get(call.id)!
       this.emitTool(call.id, outcome.status, outcome.content, outcome.result)
       this.messages.push({ role: 'tool', toolCallId: call.id, name: call.name, content: outcome.content })
+      // 截图等工具结果以用户消息回传视觉模型（工具消息在 OpenAI 协议中只能承载文本）。
+      const attachments = this.visionAttachments(outcome.result)
+      if (attachments) this.messages.push({ role: 'user', content: attachments })
     }
     this.reportContext()
+  }
+
+  /** 组装工具结果附带的视觉内容；模型不具备图像能力时降级为文本提示。 */
+  private visionAttachments(result?: ToolResult): ProviderMessage['content'] | null {
+    const parts = result?.attachments ?? []
+    if (parts.length === 0) return null
+    if (!this.options.model.modalities.includes('image')) {
+      return '[工具产生了图像结果，但当前模型不支持视觉输入；请改用视觉模型理解图像内容。]'
+    }
+    return [
+      { kind: 'text', text: '[工具回传图像] 请结合上文理解以下工具产生的图像内容。' },
+      ...parts
+    ]
   }
 
   private async executeOne(call: ToolCall): Promise<ExecutedCall> {
@@ -326,6 +345,7 @@ export class AgentLoop {
         truncated: result?.truncated ?? false,
         outputFile: result?.outputFile,
         diff: result?.diff || undefined,
+        attachments: result?.attachments?.length ? result.attachments : undefined,
         outputBytes: Buffer.byteLength(content, 'utf8')
       }
     })
@@ -535,6 +555,9 @@ function appendEventMessages(messages: ProviderMessage[], events: SessionEvent[]
       messages.push({ role: 'assistant', content: event.text, reasoningContent: event.thinking, toolCalls: event.toolCalls.map((call) => ({ id: call.id, name: call.name, arguments: JSON.stringify(call.input) })) })
     } else if (event.type === 'toolResult' && event.result.status !== 'running') {
       messages.push({ role: 'tool', toolCallId: event.result.toolCallId, name: callNames.get(event.result.toolCallId), content: event.result.content })
+      if (event.result.attachments?.length) {
+        messages.push({ role: 'user', content: [{ kind: 'text', text: '[工具回传图像] 请结合上文理解以下工具产生的图像内容。' }, ...event.result.attachments] })
+      }
     }
   }
 }

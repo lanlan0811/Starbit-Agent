@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ContentPart } from '@core/events'
 import { ToolRegistry } from '@core/tools/registry'
 import type { ToolContext, ToolDefinition, ToolResult } from '@core/tools/types'
 import type { BrowserAutomation } from './types'
@@ -153,7 +154,9 @@ export function registerBrowserTools(registry: ToolRegistry, browser: BrowserAut
         path: stringValue(input.path),
         fullPage: input.fullPage === true
       })
-      return externalResult(`浏览器截图已保存：${result.path}\n尺寸：${result.width}×${result.height}，${result.bytes} 字节`, result)
+      return externalResult(`浏览器截图已保存：${result.path}\n尺寸：${result.width}×${result.height}，${result.bytes} 字节`, result, [
+        { kind: 'image', source: result.path, mimeType: 'image/png' }
+      ])
     }
   )
 
@@ -222,8 +225,8 @@ function definition(
   return { name: fullName, fullName, description, kind: 'browser', readOnly, semanticLabel, inputSchema, inputJsonSchema, dangerLevel, source: 'builtin' }
 }
 
-function externalResult(content: string, data: unknown): ToolResult {
-  return { content, data: data as ToolResult['data'], untrusted: true }
+function externalResult(content: string, data: unknown, attachments?: ContentPart[]): ToolResult {
+  return { content, data: data as ToolResult['data'], untrusted: true, ...(attachments?.length ? { attachments } : {}) }
 }
 
 function stringValue(value: unknown): string | undefined {

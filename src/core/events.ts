@@ -27,6 +27,8 @@ export interface ToolCallResult {
   outputFile?: string
   /** 文件编辑类工具附带的 unified diff（仅用于 UI 展示） */
   diff?: string
+  /** 随工具结果回传给视觉模型的图片/视频（如浏览器截图） */
+  attachments?: ContentPart[]
 }
 
 /** 工具调用 */

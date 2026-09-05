@@ -29,6 +29,8 @@ export interface ProviderRequest {
   sampling?: Record<string, JsonValue>
   promptCacheKey?: string
   signal?: AbortSignal
+  /** 抽帧降级：模型 videoStrategy=image-frames 时由请求层调用 */
+  extractVideoFrames?: (source: string, mimeType?: string) => Promise<string[]>
 }
 
 export interface NormalizedUsage {

@@ -26,7 +26,8 @@ const schema = z.object({
     inputPerMillion: z.number().min(0).max(100000),
     cachedInputPerMillion: z.number().min(0).max(100000),
     outputPerMillion: z.number().min(0).max(100000)
-  }).strict().optional()
+  }).strict().optional(),
+  videoStrategy: z.enum(['video_url', 'image-frames']).optional()
 }).strict().refine((model) => model.maxOutputTokens < model.contextWindow, '输出上限必须小于上下文窗口')
 
 export function validateModelConfig(value: unknown): ModelConfig {

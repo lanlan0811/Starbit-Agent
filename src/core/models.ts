@@ -79,6 +79,8 @@ export interface ModelConfig {
   }
   /** 费用估算单价（¥/百万 tokens）；自定义模型可留空则不计费 */
   pricing?: ModelPricing
+  /** 视频输入方式：原生 video_url 或抽帧为图片序列（§2.1 多模态抽象） */
+  videoStrategy?: 'video_url' | 'image-frames'
 }
 
 /**
@@ -182,7 +184,9 @@ export const BUILTIN_MODELS: ModelConfig[] = [
     usageCachedTokensPath: 'prompt_cache_hit_tokens',
     usageCacheScope: 'top',
     reasoning: { clearThinking: false },
-    pricing: { inputPerMillion: 2, cachedInputPerMillion: 0.4, outputPerMillion: 8 }
+    pricing: { inputPerMillion: 2, cachedInputPerMillion: 0.4, outputPerMillion: 8 },
+    // DeepSeek 视觉实验模型经 OpenAI 协议无稳定 video_url 通道，降级为抽帧输入（§3.5 规则 5：未验证组合）
+    videoStrategy: 'image-frames'
   },
   {
     id: 'glm-5.2',

@@ -1,5 +1,5 @@
 import type { ModelConfig } from '@core/models'
-import { prepareProviderRequest } from './request'
+import { prepareProviderRequest, resolveMediaSource } from './request'
 import { decodeSse, type SseMessage } from './sse'
 import type { ProviderRequest, ProviderStreamEvent } from './types'
 import { normalizeUsage } from './usage'
@@ -10,7 +10,7 @@ export class OpenAiCompatibleProvider {
   constructor(private readonly fetcher: typeof fetch = fetch) {}
 
   async *stream(request: ProviderRequest): AsyncGenerator<ProviderStreamEvent> {
-    const prepared = await prepareProviderRequest(request)
+    const prepared = await prepareProviderRequest(request, resolveMediaSource, request.extractVideoFrames)
     const response = await this.fetcher(prepared.url, prepared.init)
     if (!response.ok) throw await createHttpError(response)
     if (!response.body) throw new Error('模型响应缺少可读取的流')

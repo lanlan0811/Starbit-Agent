@@ -43,7 +43,9 @@ const api: IpcApi = {
     getShell: () => ipcRenderer.invoke('settings:getShell'),
     setShell: (shell) => ipcRenderer.invoke('settings:setShell', shell),
     getCompaction: () => ipcRenderer.invoke('settings:getCompaction'),
-    setCompaction: (patch) => ipcRenderer.invoke('settings:setCompaction', patch)
+    setCompaction: (patch) => ipcRenderer.invoke('settings:setCompaction', patch),
+    getVideo: () => ipcRenderer.invoke('settings:getVideo'),
+    setVideo: (patch) => ipcRenderer.invoke('settings:setVideo', patch)
   },
   skills: {
     list: (workspacePath) => ipcRenderer.invoke('skills:list', workspacePath)

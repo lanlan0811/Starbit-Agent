@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ContentPart } from '../events'
 import type { JsonValue } from '../types'
 
 /**
@@ -82,6 +83,8 @@ export interface ToolResult {
   data?: JsonValue
   /** 文件编辑类工具附带的 unified diff（仅入事件流供 UI 展示，不回传模型） */
   diff?: string
+  /** 随工具结果回传给视觉模型的图片/视频（如浏览器截图）；仅入事件流与 provider 消息 */
+  attachments?: ContentPart[]
   /** 是否被截断 */
   truncated?: boolean
   /** 大输出落盘路径 */
