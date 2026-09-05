@@ -21,7 +21,7 @@ const api: IpcApi = {
     testConnection: (modelId) => ipcRenderer.invoke('models:testConnection', modelId)
   },
   agent: {
-    send: (sessionId, content, attachments, thinkingLevel) => ipcRenderer.invoke('agent:send', sessionId, content, attachments, thinkingLevel),
+    send: (sessionId, content, attachments, thinkingLevel, fileRefs) => ipcRenderer.invoke('agent:send', sessionId, content, attachments, thinkingLevel, fileRefs),
     cancel: (sessionId) => ipcRenderer.invoke('agent:cancel', sessionId),
     respondCompaction: (requestId, accepted) => ipcRenderer.invoke('agent:respondCompaction', requestId, accepted)
   },
@@ -90,7 +90,9 @@ const api: IpcApi = {
     search: (sessionId, query, scope) => ipcRenderer.invoke('memory:search', sessionId, query, scope)
   },
   workspace: {
-    selectFolder: () => ipcRenderer.invoke('workspace:selectFolder')
+    selectFolder: () => ipcRenderer.invoke('workspace:selectFolder'),
+    listFiles: (workspacePath) => ipcRenderer.invoke('workspace:listFiles', workspacePath),
+    readFile: (workspacePath, path) => ipcRenderer.invoke('workspace:readFile', workspacePath, path)
   }
 }
 

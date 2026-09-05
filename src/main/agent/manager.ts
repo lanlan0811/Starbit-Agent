@@ -121,7 +121,7 @@ export class AgentManager {
     private readonly browser?: BrowserAutomation
   ) {}
 
-  async send(sessionId: string, content: string, attachments: ContentPart[] = [], thinkingLevel: ThinkingLevel = 'max'): Promise<void> {
+  async send(sessionId: string, content: string, attachments: ContentPart[] = [], thinkingLevel: ThinkingLevel = 'max', fileRefs: string[] = []): Promise<void> {
     if (this.active.has(sessionId) || this.starting.has(sessionId)) throw new Error('当前会话已有任务正在运行')
     const session = this.sessions.get(sessionId)
     if (!session) throw new Error(`会话不存在: ${sessionId}`)
@@ -187,7 +187,8 @@ export class AgentManager {
       await loop.run(
         hookedPrompt.content,
         hookedPrompt.attachments,
-        directSkillContext ? `<loaded-skill>\n${directSkillContext}\n</loaded-skill>` : ''
+        directSkillContext ? `<loaded-skill>\n${directSkillContext}\n</loaded-skill>` : '',
+        fileRefs
       )
       await memory.saveSessionSummary(sessionId, summarizeSession(this.sessions.replay(sessionId)))
       await hooks.run('SessionEnd', { sessionId, workspacePath: session.workspacePath, payload: { status: 'completed' } })

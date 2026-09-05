@@ -6,6 +6,7 @@ import type { ToolContext, ToolDefinition, ToolResult } from '@core/tools/types'
 import { limitToolOutput } from './output'
 import { resolveAuthorizedPath } from './workspace'
 import { runBoundedProcess } from './process'
+import { unifiedDiff } from './diff'
 
 type InputRecord = Record<string, unknown>
 
@@ -54,8 +55,12 @@ export function createBuiltinToolRegistry(options: BuiltinToolOptions): ToolRegi
       const target = authorized(ctx, String(input.path))
       await mkdir(dirname(target), { recursive: true })
       const content = String(input.content)
+      const previous = await readFile(target, 'utf8').catch(() => null)
       await writeFile(target, content, 'utf8')
-      return { content: `已写入 ${target}（${Buffer.byteLength(content, 'utf8')} 字节）` }
+      return {
+        content: previous === null ? `已创建 ${target}（${Buffer.byteLength(content, 'utf8')} 字节）` : `已覆盖写入 ${target}（${Buffer.byteLength(content, 'utf8')} 字节）`,
+        diff: unifiedDiff(previous ?? '', content)
+      }
     }
   )
 
@@ -74,7 +79,10 @@ export function createBuiltinToolRegistry(options: BuiltinToolOptions): ToolRegi
       if (count > 1 && input.replaceAll !== true) throw new Error(`待替换文本在 ${target} 中出现 ${count} 次，请扩大上下文或设置 replaceAll`)
       const next = input.replaceAll === true ? source.split(oldText).join(String(input.newText)) : source.replace(oldText, String(input.newText))
       await writeFile(target, next, 'utf8')
-      return { content: `已编辑 ${target}（替换 ${input.replaceAll === true ? count : 1} 处）` }
+      return {
+        content: `已编辑 ${target}（替换 ${input.replaceAll === true ? count : 1} 处）`,
+        diff: unifiedDiff(source, next)
+      }
     }
   )
 

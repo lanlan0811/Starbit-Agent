@@ -43,6 +43,8 @@ interface AppState {
   contextStatus: ContextStatus | null
   cacheDiagnostic: CacheDiagnostic | null
   rightPanel: 'browser' | 'terminal' | null
+  /** 文件树面板请求输入框插入的 @引用（消费后清空） */
+  pendingFileRef: string | null
   setReady: (v: boolean) => void
   setAppVersion: (v: string) => void
   setWorkspacePath: (p: string) => void
@@ -63,9 +65,11 @@ interface AppState {
   setContextStatus: (status: ContextStatus | null) => void
   setCacheDiagnostic: (diagnostic: CacheDiagnostic | null) => void
   setRightPanel: (panel: AppState['rightPanel']) => void
+  queueFileRef: (path: string) => void
+  consumeFileRef: () => string | null
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   appVersion: '',
   workspacePath: '',
@@ -85,6 +89,7 @@ export const useAppStore = create<AppState>((set) => ({
   contextStatus: null,
   cacheDiagnostic: null,
   rightPanel: null,
+  pendingFileRef: null,
   setReady: (v) => set({ ready: v }),
   setAppVersion: (v) => set({ appVersion: v }),
   setWorkspacePath: (p) => set({ workspacePath: p }),
@@ -109,5 +114,11 @@ export const useAppStore = create<AppState>((set) => ({
   clearStream: () => set({ streamingText: '', streamingThinking: '' }),
   setContextStatus: (status) => set({ contextStatus: status }),
   setCacheDiagnostic: (diagnostic) => set({ cacheDiagnostic: diagnostic }),
-  setRightPanel: (panel) => set({ rightPanel: panel })
+  setRightPanel: (panel) => set({ rightPanel: panel }),
+  queueFileRef: (path) => set({ pendingFileRef: path }),
+  consumeFileRef: (): string | null => {
+    const value = get().pendingFileRef
+    if (value !== null) set({ pendingFileRef: null })
+    return value
+  }
 }))

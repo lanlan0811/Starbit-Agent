@@ -80,6 +80,8 @@ export interface ToolResult {
   content: string
   /** 结构化数据 */
   data?: JsonValue
+  /** 文件编辑类工具附带的 unified diff（仅入事件流供 UI 展示，不回传模型） */
+  diff?: string
   /** 是否被截断 */
   truncated?: boolean
   /** 大输出落盘路径 */

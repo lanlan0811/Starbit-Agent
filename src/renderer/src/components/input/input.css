@@ -31,12 +31,50 @@
   padding: 0;
 }
 
+.input-area__chip--ref { display: inline-flex; max-width: 260px; color: var(--color-primary); }
+.input-area__chip--ref span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .input-area__box {
+  position: relative;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-input);
   background: var(--color-bg-surface);
   box-shadow: var(--shadow-1);
-  overflow: hidden;
+  overflow: visible;
+}
+
+.input-area__mention {
+  position: absolute;
+  left: var(--space-2);
+  bottom: calc(100% + var(--space-1));
+  z-index: 30;
+  min-width: 280px;
+  max-width: 420px;
+  max-height: 216px;
+  margin: 0;
+  overflow: auto;
+  list-style: none;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.input-area__mention button {
+  display: grid;
+  width: 100%;
+  gap: 1px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-input);
+  text-align: left;
+}
+
+.input-area__mention li.is-active button { background: var(--color-primary-weak); }
+.input-area__mention-name { font-size: var(--font-size-caption); color: var(--color-text-primary); }
+.input-area__mention-path {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--color-text-secondary); font-size: 11px; font-family: var(--font-mono);
 }
 
 .input-area__textbox:focus-within {

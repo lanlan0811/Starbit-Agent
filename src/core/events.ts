@@ -25,6 +25,8 @@ export interface ToolCallResult {
   outputBytes?: number
   /** 实际落盘路径（大输出不直接回传，只回路径） */
   outputFile?: string
+  /** 文件编辑类工具附带的 unified diff（仅用于 UI 展示） */
+  diff?: string
 }
 
 /** 工具调用 */

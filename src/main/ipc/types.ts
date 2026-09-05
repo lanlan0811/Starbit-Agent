@@ -13,6 +13,7 @@ import type { MemoryEntry, MemoryScope, MemorySearchHit } from '../memory/types'
 import type { CacheDiagnostic } from '../agent/loop'
 import type { ContextStatus } from '../agent/context'
 import type { CompactionPromptDto } from '../agent/manager'
+import type { WorkspaceEntryDto } from '../workspace/list'
 
 /**
  * IPC API 契约 —— 主进程暴露给渲染进程的能力。
@@ -45,7 +46,7 @@ export interface IpcApi {
     testConnection(modelId: string): Promise<{ ok: boolean; latencyMs: number; message: string }>
   }
   agent: {
-    send(sessionId: string, content: string, attachments?: ContentPart[], thinkingLevel?: ThinkingLevel): Promise<void>
+    send(sessionId: string, content: string, attachments?: ContentPart[], thinkingLevel?: ThinkingLevel, fileRefs?: string[]): Promise<void>
     cancel(sessionId: string): Promise<void>
     respondCompaction(requestId: string, accepted: boolean): Promise<boolean>
   }
@@ -115,6 +116,8 @@ export interface IpcApi {
   }
   workspace: {
     selectFolder(): Promise<{ path: string } | null>
+    listFiles(workspacePath: string): Promise<WorkspaceEntryDto[]>
+    readFile(workspacePath: string, path: string): Promise<{ path: string; content: string; truncated: boolean }>
   }
 }
 

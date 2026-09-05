@@ -1,4 +1,4 @@
-import type { SessionEvent } from '@core/events'
+import type { SessionEvent, ToolCall } from '@core/events'
 import { UserMessage } from './messages/UserMessage'
 import { AssistantMessage } from './messages/AssistantMessage'
 import { ThinkingBlock } from './messages/ThinkingBlock'
@@ -6,7 +6,7 @@ import { ToolMessage } from './messages/ToolMessage'
 import { CompactionBanner } from './messages/CompactionBanner'
 import { ErrorMessage } from './messages/ErrorMessage'
 
-export function MessageRenderer({ event }: { event: SessionEvent }): JSX.Element | null {
+export function MessageRenderer({ event, toolCalls = {} }: { event: SessionEvent; toolCalls?: Record<string, ToolCall> }): JSX.Element | null {
   switch (event.type) {
     case 'userMessage':
       return <UserMessage event={event} />
@@ -15,7 +15,7 @@ export function MessageRenderer({ event }: { event: SessionEvent }): JSX.Element
     case 'thinking':
       return <ThinkingBlock event={event} />
     case 'toolResult':
-      return <ToolMessage event={event} />
+      return <ToolMessage event={event} toolCalls={toolCalls} />
     case 'compaction':
       return <CompactionBanner event={event} />
     case 'error':

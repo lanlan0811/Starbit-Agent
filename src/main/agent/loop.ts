@@ -112,7 +112,7 @@ export class AgentLoop {
     this.controller?.abort()
   }
 
-  async run(content: string, attachments: ContentPart[] = [], appendedContext = ''): Promise<void> {
+  async run(content: string, attachments: ContentPart[] = [], appendedContext = '', fileRefs: string[] = []): Promise<void> {
     if (this.running) throw new Error('当前会话的 Agent 正在运行')
     this.running = true
     this.controller = new AbortController()
@@ -120,11 +120,13 @@ export class AgentLoop {
       this.emit({
         type: 'userMessage',
         content,
-        attachments: attachments.length ? attachments : undefined
+        attachments: attachments.length ? attachments : undefined,
+        fileRefs: fileRefs.length ? fileRefs : undefined
       })
+      const referenced = withFileRefs(content, fileRefs)
       const userContent: ProviderMessage['content'] = attachments.length
-        ? [{ kind: 'text', text: content }, ...attachments]
-        : content
+        ? [{ kind: 'text', text: referenced }, ...attachments]
+        : referenced
       this.messages.push({ role: 'user', content: userContent })
       if (appendedContext.trim()) this.messages.push({ role: 'system', content: appendedContext })
       if (content.trim() === '/compact' && attachments.length === 0) {
@@ -321,6 +323,7 @@ export class AgentLoop {
         content,
         truncated: result?.truncated ?? false,
         outputFile: result?.outputFile,
+        diff: result?.diff || undefined,
         outputBytes: Buffer.byteLength(content, 'utf8')
       }
     })
@@ -508,7 +511,8 @@ function appendEventMessages(messages: ProviderMessage[], events: SessionEvent[]
   const callNames = new Map<string, string>()
   for (const event of events) {
     if (event.type === 'userMessage') {
-      messages.push({ role: 'user', content: event.attachments?.length ? [{ kind: 'text', text: event.content }, ...event.attachments] : event.content })
+      const referenced = withFileRefs(event.content, event.fileRefs ?? [])
+      messages.push({ role: 'user', content: event.attachments?.length ? [{ kind: 'text', text: referenced }, ...event.attachments] : referenced })
     } else if (event.type === 'assistantMessage') {
       for (const call of event.toolCalls) callNames.set(call.id, call.name)
       messages.push({ role: 'assistant', content: event.text, reasoningContent: event.thinking, toolCalls: event.toolCalls.map((call) => ({ id: call.id, name: call.name, arguments: JSON.stringify(call.input) })) })
@@ -525,6 +529,12 @@ function describeImpact(request: PermissionRequest): string {
 
 function wrapUntrusted(content: string): string {
   return `<untrusted-data>\n${content}\n</untrusted-data>`
+}
+
+/** 将 @文件 引用追加为用户消息尾部文本，保证回放与首传的 provider 消息一致。 */
+function withFileRefs(content: string, fileRefs: string[]): string {
+  if (!fileRefs.length) return content
+  return `${content}\n\n[引用文件]\n${fileRefs.map((path) => `- ${path}`).join('\n')}`
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

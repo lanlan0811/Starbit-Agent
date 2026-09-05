@@ -8,6 +8,7 @@ import { deleteWhitelist, listWhitelist } from '../session/database'
 import { PtyHost } from '../pty/host'
 import { BrowserManager } from '../browser/manager'
 import type { BrowserBounds, BrowserControlMode } from '../browser/types'
+import { listWorkspaceFiles, readWorkspaceFilePreview } from '../workspace/list'
 
 const sessions = new SessionManager()
 const settings = new SettingsService()
@@ -59,8 +60,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('models:testConnection', (_e, modelId: string) => agents.testModel(modelId))
 
   // Agent & permissions
-  ipcMain.handle('agent:send', (_e, sessionId: string, content: string, attachments = [], thinkingLevel = 'max') =>
-    agents.send(sessionId, content, attachments, thinkingLevel)
+  ipcMain.handle('agent:send', (_e, sessionId: string, content: string, attachments = [], thinkingLevel = 'max', fileRefs: string[] = []) =>
+    agents.send(sessionId, content, attachments, thinkingLevel, fileRefs)
   )
   ipcMain.handle('agent:cancel', (_e, sessionId: string) => agents.cancel(sessionId))
   ipcMain.handle('agent:respondCompaction', (_e, requestId: string, accepted: boolean) => agents.respondCompaction(requestId, accepted))
@@ -185,6 +186,8 @@ export function registerIpcHandlers(): void {
     if (result.canceled || result.filePaths.length === 0) return null
     return { path: result.filePaths[0] }
   })
+  ipcMain.handle('workspace:listFiles', (_e, workspacePath: string) => listWorkspaceFiles(workspacePath))
+  ipcMain.handle('workspace:readFile', (_e, workspacePath: string, path: string) => readWorkspaceFilePreview(workspacePath, path))
 }
 
 export async function shutdownIpcServices(): Promise<void> {

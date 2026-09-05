@@ -6,6 +6,7 @@ import { useAppStore } from '../../stores/app'
 import { KnowledgePanel } from './KnowledgePanel'
 import { MemoryPanel } from './MemoryPanel'
 import { ModelEditor } from './ModelEditor'
+import { FilesPanel } from './FilesPanel'
 import './panels.css'
 
 const TITLES: Record<string, string> = {
@@ -18,7 +19,7 @@ export function SecondaryPanel(): JSX.Element {
     <aside className="secondary-panel" aria-label={TITLES[active] ?? '功能面板'}>
       <header className="secondary-panel__header">{TITLES[active] ?? active}</header>
       <div className="secondary-panel__body">
-        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : active === 'mcp' ? <McpPanel /> : active === 'kb' ? <KnowledgePanel /> : active === 'memory' ? <MemoryPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
+        {active === 'sessions' ? <SessionsPanel /> : active === 'settings' ? <SettingsPanel /> : active === 'usage' ? <UsagePanel /> : active === 'audit' ? <AuditPanel /> : active === 'skills' ? <SkillsPanel /> : active === 'mcp' ? <McpPanel /> : active === 'kb' ? <KnowledgePanel /> : active === 'memory' ? <MemoryPanel /> : active === 'files' ? <FilesPanel /> : <ComingPanel title={TITLES[active] ?? active} />}
       </div>
     </aside>
   )
