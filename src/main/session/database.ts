@@ -1,24 +1,19 @@
-import initSqlJs, { type Database } from 'sql.js'
+import Database, { type Database as SqliteDatabase } from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import { createRequire } from 'node:module'
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync } from 'fs'
 import type { SessionEvent } from '@core/events'
 
 /**
- * SQLite 数据库层 —— 全本地存储（sql.js，纯 JS/WASM，无原生编译依赖）。
+ * SQLite 数据库层 —— 全本地存储（better-sqlite3 同步引擎，按计划 §5.2 技术选型）。
  * 表：sessions（会话）、events（append-only 事件日志）、whitelist（权限白名单）、
  *      usage（用量统计）、audit_log（审计日志）、settings（设置）。
  *
- * sql.js 以内存数据库 + 磁盘文件同步的方式工作，提供 export() 将整个库
- * 序列化落盘。为满足"全本地持久化"，采用
- * 写后立即 export 落盘策略（数据量小、桌面端可接受）。
+ * better-sqlite3 直接读写磁盘文件；导出/导入经 serialize() 与 Buffer 构造完成。
  */
 
-let db: Database | null = null
-let SQL: initSqlJs.SqlJsStatic | null = null
+let db: SqliteDatabase | null = null
 let dbPath = ''
-const nodeRequire = createRequire(import.meta.url)
 
 function userDataDir(): string {
   const dir = join(app.getPath('userData'))
@@ -26,64 +21,41 @@ function userDataDir(): string {
   return dir
 }
 
-/** 定位 sql.js 的 WASM 文件路径 */
-function locateWasmFile(): string {
-  const candidates = [
-    join(process.resourcesPath ?? '', 'app.asar.unpacked', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
-    join(__dirname, '..', '..', '..', '..', 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
-    nodeRequire.resolve('sql.js/dist/sql-wasm.wasm')
-  ]
-  for (const p of candidates) {
-    if (p && existsSync(p)) return p
-  }
-  return ''
-}
-
-export async function initDatabase(): Promise<Database> {
+export async function initDatabase(): Promise<SqliteDatabase> {
   if (db) return db
   dbPath = join(userDataDir(), 'starbit.db')
-  SQL = await initSqlJs({ locateFile: locateWasmFile })
-  if (existsSync(dbPath)) {
-    db = new SQL.Database(readFileSync(dbPath))
-  } else {
-    db = new SQL.Database()
-    migrate()
-    persist()
-  }
+  db = new Database(dbPath)
   migrate()
   return db
 }
 
-export function getDb(): Database {
+export function getDb(): SqliteDatabase {
   if (!db) throw new Error('数据库尚未初始化')
   return db
 }
 
-/** 将内存库落盘 */
+/** 兼容保留：better-sqlite3 同步写盘，无需手动落盘。 */
 export function persist(): void {
-  if (!db) return
-  const data = db.export()
-  writeFileSync(dbPath, Buffer.from(data))
+  void db
 }
 
 /** 全量数据导出：整个 SQLite 库序列化为字节流（含会话、事件、白名单、审计与设置）。 */
 export function exportDatabase(): Uint8Array {
-  return getDb().export()
+  return new Uint8Array(getDb().serialize())
 }
 
-/** 全量数据导入：校验文件结构后整体替换当前库并落盘。 */
+/** 全量数据导入：校验文件结构后整体替换当前库。 */
 export function importDatabase(bytes: Uint8Array): void {
-  if (!SQL) throw new Error('数据库尚未初始化')
-  let candidate: Database
+  let candidate: SqliteDatabase
   try {
-    candidate = new SQL.Database(bytes)
+    candidate = new Database(Buffer.from(bytes))
   } catch {
     throw new Error('导入文件不是有效的 Starbit 数据库备份')
   }
   try {
     const required = ['sessions', 'events', 'whitelist', 'settings']
-    const result = candidate.exec("SELECT name FROM sqlite_master WHERE type = 'table'")
-    const names = new Set((result[0]?.values ?? []).map((row) => String(row[0])))
+    const rows = candidate.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>
+    const names = new Set(rows.map((row) => String(row.name)))
     const missing = required.filter((table) => !names.has(table))
     if (missing.length > 0) throw new Error(`备份缺少必需数据表: ${missing.join(', ')}`)
   } catch (error) {
@@ -93,12 +65,12 @@ export function importDatabase(bytes: Uint8Array): void {
   db?.close()
   db = candidate
   migrate()
-  persist()
 }
 
 function migrate(): void {
   const d = getDb()
-  d.run(`
+  d.pragma('foreign_keys = ON')
+  d.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL DEFAULT '',
@@ -160,25 +132,15 @@ function migrate(): void {
 
 /** 通用查询辅助 */
 function all<T>(sql: string, params: unknown[] = []): T[] {
-  const stmt = getDb().prepare(sql)
-  stmt.bind(params as never[])
-  const rows: T[] = []
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject() as T)
-  }
-  stmt.free()
-  return rows
+  return getDb().prepare(sql).all(...params) as T[]
 }
 
 function get<T>(sql: string, params: unknown[] = []): T | undefined {
-  return all<T>(sql, params)[0]
+  return getDb().prepare(sql).get(...params) as T | undefined
 }
 
 function run(sql: string, params: unknown[] = []): void {
-  const stmt = getDb().prepare(sql)
-  stmt.bind(params as never[])
-  stmt.step()
-  stmt.free()
+  getDb().prepare(sql).run(...params)
 }
 
 export interface SessionRow {
